@@ -1,100 +1,119 @@
-import Image from "next/image";
+import Link from "next/link";
+import { FaBookOpen, FaChartLine, FaLightbulb, FaPray } from "react-icons/fa";
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Navigation */}
+      <nav className="container mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="text-2xl font-bold text-gray-800">Deeni by SAFR+</div>
+          <div className="space-x-4">
+            <Link
+              href="/login"
+              className="text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Login
+            </Link>
+            <Link
+              href="/register"
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      </nav>
+
+      {/* Hero Section */}
+      <section className="container mx-auto px-6 py-16 text-center">
+        <h1 className="text-5xl font-bold text-gray-900 mb-6">
+          Track Good Deeds & Gain Islamic Insights
+        </h1>
+        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          Deeni helps you consistently track good deeds while providing AI-powered
+          insights from the Quran and Hadith, making your spiritual journey more
+          meaningful.
+        </p>
+        <Link
+          href="/register"
+          className="bg-emerald-600 text-white px-8 py-3 rounded-lg text-lg hover:bg-emerald-700 transition-colors inline-block"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Start Your Journey
+        </Link>
+      </section>
+
+      {/* Features Section */}
+      <section className="container mx-auto px-6 py-16">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
+              <FaPray className="text-2xl text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Habit Tracking</h3>
+            <p className="text-gray-600">
+              Track your daily prayers, Quran recitation, and other good deeds
+              consistently.
+            </p>
+          </div>
+
+          <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
+              <FaLightbulb className="text-2xl text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">AI-Powered Insights</h3>
+            <p className="text-gray-600">
+              Receive personalized insights from the Quran and Hadith using advanced
+              AI technology.
+            </p>
+          </div>
+
+          <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
+              <FaChartLine className="text-2xl text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Progress Tracking</h3>
+            <p className="text-gray-600">
+              Visualize your spiritual growth with detailed progress analytics and
+              statistics.
+            </p>
+          </div>
+
+          <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
+              <FaBookOpen className="text-2xl text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Islamic Knowledge</h3>
+            <p className="text-gray-600">
+              Expand your understanding of Islam through curated content and
+              resources.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="container mx-auto px-6 py-16 text-center">
+        <h2 className="text-3xl font-bold text-gray-900 mb-6">
+          Begin Your Spiritual Journey Today
+        </h2>
+        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          Join thousands of Muslims who are enhancing their spiritual journey with
+          Deeni. Start tracking your good deeds and gaining valuable insights now.
+        </p>
+        <Link
+          href="/register"
+          className="bg-emerald-600 text-white px-8 py-3 rounded-lg text-lg hover:bg-emerald-700 transition-colors inline-block"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          Create Free Account
+        </Link>
+      </section>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-6 py-8 border-t">
+        <div className="text-center text-gray-600">
+          <p>&copy; {new Date().getFullYear()} Deeni by SAFR+. All rights reserved.</p>
+        </div>
       </footer>
     </div>
   );
