@@ -7,62 +7,42 @@ import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
-
-interface GrowthGoal {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  progress: number;
-  status: 'not_started' | 'in_progress' | 'completed';
-  suggested_actions: string[];
-  target_date?: string;
-}
-
-interface MoodPattern {
-  category: string;
-  frequency: number;
-  insights: string[];
-}
-
-interface GrowthPlan {
-  id: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  goals: GrowthGoal[];
-  mood_patterns: MoodPattern[];
-  recommendations: string[];
-  focus_areas: string[];
-}
+import { GrowthPlan, GrowthGoal } from '@/types/growth-plan';
+import { fetchGrowthPlan, updateGoalProgress } from '@/services/growth-plan';
+import { getStatusColor, getCategoryColor, formatDate } from '@/utils/growth-plan';
+import { toast } from 'sonner';
+import Image from 'next/image';
 
 const GrowthPlanComponent = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [growthPlan, setGrowthPlan] = useState<GrowthPlan | null>(null);
   const [selectedGoal, setSelectedGoal] = useState<GrowthGoal | null>(null);
 
   useEffect(() => {
-    fetchGrowthPlan();
+    loadGrowthPlan();
   }, []);
 
-  const fetchGrowthPlan = async () => {
+  const loadGrowthPlan = async () => {
     try {
-      const response = await fetch('/api/personalization/growth-plan');
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch growth plan');
+      setIsLoading(true);
+      setError(null);
+      const response = await fetchGrowthPlan();
+      
+      if (response.error) {
+        throw new Error(response.error.message);
       }
 
-      if (data.growthPlan) {
-        setGrowthPlan(data.growthPlan);
+      if (!response.data) {
+        throw new Error('No growth plan data received');
       }
+
+      setGrowthPlan(response.data);
     } catch (error) {
-      console.error('Error fetching growth plan:', error);
-      if (error instanceof Error && !error.message.includes('Unauthorized')) {
-        alert(error.message);
-      }
+      const message = error instanceof Error ? error.message : 'Failed to load growth plan';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -72,21 +52,13 @@ const GrowthPlanComponent = () => {
     if (!growthPlan) return;
 
     try {
-      const response = await fetch('/api/personalization/growth-plan', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          goal_id: goalId,
-          progress: newProgress,
-        }),
+      const response = await updateGoalProgress({
+        goal_id: goalId,
+        progress: newProgress,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update goal progress');
+      if (response.error) {
+        throw new Error(response.error.message);
       }
 
       // Update local state
@@ -101,41 +73,29 @@ const GrowthPlanComponent = () => {
           ),
         };
       });
+
+      toast.success('Goal progress updated successfully');
     } catch (error) {
-      console.error('Error updating goal progress:', error);
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert('Failed to update goal progress');
-      }
+      const message = error instanceof Error ? error.message : 'Failed to update goal progress';
+      toast.error(message);
     }
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      not_started: 'bg-slate-100 text-slate-800',
-      in_progress: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-    };
-    return colors[status as keyof typeof colors] || colors.not_started;
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors = {
-      'Prayer': 'bg-indigo-100 text-indigo-800',
-      'Quran': 'bg-emerald-100 text-emerald-800',
-      'Dhikr': 'bg-purple-100 text-purple-800',
-      'Fasting': 'bg-amber-100 text-amber-800',
-      'Community': 'bg-pink-100 text-pink-800',
-      'Knowledge': 'bg-cyan-100 text-cyan-800',
-    };
-    return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-500">{error}</p>
+        <Button onClick={loadGrowthPlan} className="mt-4">
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -170,7 +130,7 @@ const GrowthPlanComponent = () => {
               <h3 className="text-lg font-medium mb-3">Focus Areas</h3>
               <div className="flex flex-wrap gap-2">
                 {growthPlan.focus_areas.map((area, index) => (
-                  <Badge key={index} className={getCategoryColor(area)}>
+                  <Badge key={index} className={getCategoryColor(area as any)}>
                     {area}
                   </Badge>
                 ))}
@@ -224,10 +184,10 @@ const GrowthPlanComponent = () => {
                         <CardDescription>{goal.description}</CardDescription>
                       </div>
                       <div className="flex gap-2">
-                        <Badge className={getCategoryColor(goal.category)}>
+                        <Badge className={getCategoryColor(goal.category as any)}>
                           {goal.category}
                         </Badge>
-                        <Badge className={getStatusColor(goal.status)}>
+                        <Badge className={getStatusColor(goal.status as any)}>
                           {goal.status.replace('_', ' ')}
                         </Badge>
                       </div>
@@ -270,7 +230,7 @@ const GrowthPlanComponent = () => {
                           </Button>
                           {goal.target_date && (
                             <span className="text-sm text-slate-500">
-                              Target: {new Date(goal.target_date).toLocaleDateString()}
+                              Target: {formatDate(goal.target_date)}
                             </span>
                           )}
                         </div>
@@ -293,17 +253,35 @@ const GrowthPlanComponent = () => {
                     <CardHeader>
                       <div className="flex justify-between items-center">
                         <CardTitle className="text-lg">{pattern.category}</CardTitle>
-                        <Badge className={getCategoryColor(pattern.category)}>
+                        <Badge className={getCategoryColor(pattern.category as any)}>
                           {pattern.frequency}% frequency
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {pattern.insights.map((insight, i) => (
-                          <li key={i} className="text-sm text-slate-600">{insight}</li>
-                        ))}
-                      </ul>
+                      <div className="space-y-4">
+                        <ul className="list-disc pl-5 space-y-1">
+                          {pattern.insights.map((insight, i) => (
+                            <li key={i} className="text-sm text-slate-600">{insight}</li>
+                          ))}
+                        </ul>
+
+                        {(pattern.category === 'Quran' || pattern.category === 'Hadith') && 
+                          growthPlan.insightImages?.filter(img => 
+                            img.category === pattern.category
+                          ).map((image, i) => (
+                            <div key={i} className="relative w-full aspect-square rounded-lg overflow-hidden">
+                              <Image
+                                src={image.url}
+                                alt={image.alt}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                priority={i === 0}
+                              />
+                            </div>
+                          ))}
+                      </div>
                     </CardContent>
                   </Card>
                 ))}

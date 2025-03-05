@@ -116,13 +116,53 @@ export default function HadithInsightsPage() {
       // Update local state
       if (data && data.length > 0) {
         setInsights([data[0], ...insights]);
+
+        // Automatically generate image
+        setIsGeneratingImage(true);
+        try {
+          const imageUrl = await generateHadithPoster(
+            selectedCollection,
+            number,
+            hadithText
+          );
+
+          if (imageUrl) {
+            // Save the generated content to the database
+            await supabase.from('ai_generated_content').insert({
+              user_id: userData.user.id,
+              content_type: 'hadith_poster',
+              content: imageUrl,
+              prompt: `Hadith from ${getCollectionName(selectedCollection)}, Number ${number}`,
+              created_at: new Date().toISOString(),
+              is_favorite: false,
+            });
+
+            // Update the hadith insight with the image URL
+            await supabase
+              .from('hadith_insights')
+              .update({ image_url: imageUrl })
+              .eq('id', data[0].id);
+
+            // Update local state
+            setInsights(prevInsights =>
+              prevInsights.map(item =>
+                item.id === data[0].id ? { ...item, image_url: imageUrl } : item
+              )
+            );
+
+            setGeneratedImageUrl(imageUrl);
+          }
+        } catch (imageError) {
+          console.error('Error generating image:', imageError);
+        } finally {
+          setIsGeneratingImage(false);
+        }
       }
 
       // Clear form
       setSelectedCollection('bukhari');
       setHadithNumber('');
       setHadithText('');
-      setGeneratedImageUrl(null);
     } catch (error: any) {
       setError(error.message || 'An error occurred while generating insight');
     } finally {
@@ -369,19 +409,20 @@ export default function HadithInsightsPage() {
                       <FaRegStar className="h-5 w-5" />
                     )}
                   </button>
-                  <button
-                    onClick={() => handleGenerateImage(insight)}
-                    disabled={isGeneratingImage}
-                    className="rounded-full p-2 text-green-600 hover:bg-green-50 disabled:opacity-50"
-                  >
-                    {isGeneratingImage ? (
-                      <FaSpinner className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <FaImage className="h-5 w-5" />
-                    )}
-                  </button>
                 </div>
                 <div className="mt-4">
+                  {insight.image_url && (
+                    <div className="mb-4">
+                      <div className="relative h-48 w-full overflow-hidden rounded-lg">
+                        <Image
+                          src={insight.image_url}
+                          alt={`Generated image for ${getCollectionName(insight.collection)} Hadith #${insight.number}`}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="rounded-lg bg-green-50 p-4">
                     <p className="text-gray-800">{insight.text}</p>
                   </div>
@@ -402,19 +443,6 @@ export default function HadithInsightsPage() {
                     </h4>
                     <p className="mt-2 text-gray-700">{insight.insight}</p>
                   </div>
-                  {insight.image_url && (
-                    <div className="mt-4">
-                      <h4 className="text-md font-medium text-gray-900">Generated Image:</h4>
-                      <div className="mt-2 relative h-40 w-full overflow-hidden rounded-lg">
-                        <Image
-                          src={insight.image_url}
-                          alt="Generated Hadith Poster"
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </BentoCard>
             ))}
