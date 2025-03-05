@@ -401,7 +401,7 @@ export default function HadithInsightsPage() {
                 <div className="absolute top-4 right-4 flex space-x-2 z-20">
                   <button
                     onClick={() => handleToggleFavorite(insight.id, insight.is_favorite)}
-                    className="rounded-full p-2 text-yellow-500 hover:bg-yellow-50"
+                    className="rounded-full p-2 text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
                   >
                     {insight.is_favorite ? (
                       <FaStar className="h-5 w-5" />
@@ -410,28 +410,47 @@ export default function HadithInsightsPage() {
                     )}
                   </button>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 max-h-[32rem] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
                   {insight.image_url && (
-                    <div className="mb-4">
+                    <div className="mb-4 relative">
                       <div className="relative h-48 w-full overflow-hidden rounded-lg">
                         <Image
-                          src={insight.image_url}
+                          src={insight.image_url || ''}
                           alt={`Generated image for ${getCollectionName(insight.collection)} Hadith #${insight.number}`}
                           fill
                           className="object-cover"
                         />
+                        <a
+                          href={insight.image_url || ''}
+                          download={`hadith-${insight.collection}-${insight.number}.png`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute bottom-2 right-2 inline-flex items-center rounded-md bg-black/50 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-black/70 transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const link = document.createElement('a');
+                            link.href = insight.image_url || '';
+                            link.download = `hadith-${insight.collection}-${insight.number}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          <FaImage className="mr-1.5 h-4 w-4" />
+                          Download
+                        </a>
                       </div>
                     </div>
                   )}
-                  <div className="rounded-lg bg-green-50 p-4">
-                    <p className="text-gray-800">{insight.text}</p>
+                  <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
+                    <p className="text-gray-800 dark:text-gray-200">{insight.text}</p>
                   </div>
                   <div className="mt-4">
-                    <h4 className="text-md font-medium text-gray-900 flex items-center justify-between">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center justify-between">
                       <span>Insight:</span>
                       <button
                         onClick={() => handleCopyInsight(insight.id, insight.insight)}
-                        className="rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                        className="rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
                         aria-label="Copy insight to clipboard"
                       >
                         {copiedInsightId === insight.id ? (
@@ -441,7 +460,7 @@ export default function HadithInsightsPage() {
                         )}
                       </button>
                     </h4>
-                    <p className="mt-2 text-gray-700">{insight.insight}</p>
+                    <p className="mt-2 text-gray-700 dark:text-gray-300">{insight.insight}</p>
                   </div>
                 </div>
               </BentoCard>
