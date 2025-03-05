@@ -25,6 +25,7 @@ type QuranInsight = {
   insight: string;
   created_at: string;
   is_favorite: boolean;
+  image_url?: string;
 };
 
 export default function QuranInsightsPage() {
@@ -187,13 +188,54 @@ export default function QuranInsightsPage() {
       // Update local state
       if (data && data.length > 0) {
         setInsights([data[0], ...insights]);
+        
+        // Automatically generate image
+        setIsGeneratingImage(true);
+        try {
+          const imageUrl = await generateQuranAyahPoster(
+            surahNum,
+            ayahNum,
+            quranText,
+            insight.substring(0, 100)
+          );
+
+          if (imageUrl) {
+            // Save the generated content to the database
+            await supabase.from('ai_generated_content').insert({
+              user_id: userData.user.id,
+              content_type: 'quran_poster',
+              content: imageUrl,
+              prompt: `Quran Surah ${surahNum}, Ayah ${ayahNum}`,
+              created_at: new Date().toISOString(),
+              is_favorite: false,
+            });
+
+            // Update the insight with the image URL
+            await supabase
+              .from('quran_insights')
+              .update({ image_url: imageUrl })
+              .eq('id', data[0].id);
+
+            // Update local state
+            setInsights(prevInsights =>
+              prevInsights.map(item =>
+                item.id === data[0].id ? { ...item, image_url: imageUrl } : item
+              )
+            );
+
+            setGeneratedImageUrl(imageUrl);
+          }
+        } catch (imageError) {
+          console.error('Error generating image:', imageError);
+        } finally {
+          setIsGeneratingImage(false);
+        }
       }
 
       // Clear form
       setSearchSurah('');
       setSearchAyah('');
       setQuranText('');
-      setGeneratedImageUrl(null);
       setSelectedSurah(null);
       setVerseTranslation(null);
     } catch (error: any) {
@@ -470,25 +512,39 @@ export default function QuranInsightsPage() {
                       <FaRegStar className="h-5 w-5" />
                     )}
                   </button>
-                  <Tooltip 
-                    content="Islamic art traditionally features geometric patterns, calligraphy, and arabesque designs, avoiding depictions of living beings." 
-                    source="Islamic Artistic Tradition"
-                    position="left"
-                  >
-                    <button
-                      onClick={() => handleGenerateImage(insight)}
-                      disabled={isGeneratingImage}
-                      className="rounded-full p-2 text-green-600 hover:bg-green-50 disabled:opacity-50"
-                    >
-                      {isGeneratingImage ? (
-                        <FaSpinner className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <FaImage className="h-5 w-5" />
-                      )}
-                    </button>
-                  </Tooltip>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 max-h-[32rem] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                  {insight.image_url && (
+                    <div className="mb-4 relative">
+                      <div className="relative h-48 w-full overflow-hidden rounded-lg">
+                        <Image
+                          src={insight.image_url}
+                          alt={`Generated image for Surah ${insight.surah}, Ayah ${insight.ayah}`}
+                          fill
+                          className="object-cover"
+                        />
+                        <a
+                          href={insight.image_url}
+                          download={`quran-surah-${insight.surah}-ayah-${insight.ayah}.png`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute bottom-2 right-2 inline-flex items-center rounded-md bg-black/50 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-black/70 transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const link = document.createElement('a');
+                            link.href = insight.image_url;
+                            link.download = `quran-surah-${insight.surah}-ayah-${insight.ayah}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          <FaImage className="mr-1.5 h-4 w-4" />
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   <div className="rounded-lg bg-green-50 p-4">
                     <p className="text-gray-800" dir="rtl" lang="ar">{insight.text}</p>
                   </div>

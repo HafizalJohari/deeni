@@ -2,11 +2,30 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { GrowthPlan, GrowthGoal, UpdateGoalProgressPayload } from '@/types/growth-plan';
+import { generateInsightImage } from '@/services/image-generation';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const validateGrowthPlanData = (data: any): data is GrowthPlan => {
+  if (!data || typeof data !== 'object') return false;
+  if (!Array.isArray(data.focus_areas)) return false;
+  if (!Array.isArray(data.goals)) return false;
+  if (!Array.isArray(data.mood_patterns)) return false;
+  if (!Array.isArray(data.recommendations)) return false;
+  
+  // Validate goals structure
+  return data.goals.every((goal: any) => (
+    goal.title &&
+    goal.description &&
+    goal.category &&
+    typeof goal.progress === 'number' &&
+    Array.isArray(goal.suggested_actions)
+  ));
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,23 +35,14 @@ export async function GET(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          async get(name: string) {
-            const cookie = await cookieStore.get(name);
-            return cookie?.value ?? '';
+          get(name: string) {
+            return request.cookies.get(name)?.value ?? '';
           },
-          async set(name: string, value: string, options: any) {
-            try {
-              await cookieStore.set(name, value, options);
-            } catch (error) {
-              // Ignore cookie setting errors in API routes
-            }
+          set(name: string, value: string, options: any) {
+            // Cookie setting will be handled by NextResponse
           },
-          async remove(name: string, options: any) {
-            try {
-              await cookieStore.delete(name);
-            } catch (error) {
-              // Ignore cookie removal errors in API routes
-            }
+          remove(name: string, options: any) {
+            // Cookie removal will be handled by NextResponse
           },
         },
       }
@@ -41,7 +51,10 @@ export async function GET(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Please log in to access your growth plan'
+      }, { status: 401 });
     }
 
     // Fetch user's mood entries
@@ -55,134 +68,141 @@ export async function GET(request: NextRequest) {
     if (moodError) {
       console.error('Error fetching mood entries:', moodError);
       return NextResponse.json({ 
-        error: 'Failed to fetch mood entries' 
+        error: 'Failed to fetch mood entries',
+        details: moodError.message
       }, { status: 500 });
     }
 
-    // Analyze mood patterns using OpenAI
-    const analysis = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert in Islamic spiritual development and emotional analysis. Analyze the following mood entries and create a comprehensive growth plan."
-        },
-        {
-          role: "user",
-          content: `Based on these mood entries: ${JSON.stringify(moodEntries)}, create a growth plan that includes:
-          1. Focus areas for spiritual development
-          2. Specific goals with suggested actions
-          3. Analysis of mood patterns and their spiritual significance
-          4. Personalized recommendations
-          
-          Return a JSON object with this structure:
-          {
-            "focus_areas": ["area1", "area2", ...],
-            "goals": [
-              {
-                "id": "unique_string",
-                "title": "goal title",
-                "description": "detailed description",
-                "category": "Prayer|Quran|Dhikr|Fasting|Community|Knowledge",
-                "progress": 0,
-                "status": "not_started",
-                "suggested_actions": ["action1", "action2", ...],
-                "target_date": "ISO date string"
-              }
-            ],
-            "mood_patterns": [
-              {
-                "category": "pattern category",
-                "frequency": "percentage number",
-                "insights": ["insight1", "insight2", ...]
-              }
-            ],
-            "recommendations": ["recommendation1", "recommendation2", ...]
-          }`
-        }
-      ]
-    });
+    if (!moodEntries || moodEntries.length === 0) {
+      return NextResponse.json({ 
+        error: 'No mood entries found',
+        details: 'Please add some mood entries before generating a growth plan'
+      }, { status: 404 });
+    }
 
-    let growthPlan;
     try {
-      const planData = JSON.parse(analysis.choices[0].message.content);
-      
-      // More detailed validation
-      if (!planData || typeof planData !== 'object') {
-        throw new Error('Invalid response format from OpenAI');
+      // Analyze mood patterns using OpenAI
+      const analysis = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert in Islamic spiritual development and emotional analysis. Analyze the following mood entries and create a comprehensive growth plan."
+          },
+          {
+            role: "user",
+            content: `Based on these mood entries: ${JSON.stringify(moodEntries)}, create a growth plan that includes:
+            1. Focus areas for spiritual development
+            2. Specific goals with suggested actions
+            3. Analysis of mood patterns and their spiritual significance
+            4. Personalized recommendations
+            
+            Return a JSON object with this structure:
+            {
+              "focus_areas": ["area1", "area2", ...],
+              "goals": [
+                {
+                  "id": "unique_string",
+                  "title": "goal title",
+                  "description": "detailed description",
+                  "category": "Prayer|Quran|Dhikr|Fasting|Community|Knowledge",
+                  "progress": 0,
+                  "status": "not_started",
+                  "suggested_actions": ["action1", "action2", ...],
+                  "target_date": "ISO date string"
+                }
+              ],
+              "mood_patterns": [
+                {
+                  "category": "pattern category",
+                  "frequency": "percentage number",
+                  "insights": ["insight1", "insight2", ...]
+                }
+              ],
+              "recommendations": ["recommendation1", "recommendation2", ...]
+            }`
+          }
+        ]
+      });
+
+      const content = analysis.choices[0].message.content;
+      if (!content) {
+        throw new Error('OpenAI response content is null');
       }
 
-      // Validate and ensure all required fields exist with proper types
-      if (!Array.isArray(planData.focus_areas)) {
-        throw new Error('focus_areas must be an array');
-      }
-      if (!Array.isArray(planData.recommendations)) {
-        throw new Error('recommendations must be an array');
-      }
-      if (!Array.isArray(planData.goals)) {
-        throw new Error('goals must be an array');
-      }
-      if (!Array.isArray(planData.mood_patterns)) {
-        throw new Error('mood_patterns must be an array');
+      const planData = JSON.parse(content);
+      if (!validateGrowthPlanData(planData)) {
+        throw new Error('Invalid growth plan data structure');
       }
 
-      // Validate each goal has required fields
-      const validatedGoals = planData.goals.map((goal: any, index: number) => {
-        if (!goal.title) throw new Error(`Goal at index ${index} missing title`);
-        if (!goal.description) throw new Error(`Goal at index ${index} missing description`);
-        if (!goal.category) throw new Error(`Goal at index ${index} missing category`);
-        
-        return {
+      // Generate images for insights
+      const insightImages = [];
+      for (const pattern of planData.mood_patterns) {
+        if (pattern.category === 'Quran' || pattern.category === 'Hadith') {
+          for (const insight of pattern.insights) {
+            const image = await generateInsightImage(insight, pattern.category);
+            if (image) {
+              insightImages.push(image);
+            }
+          }
+        }
+      }
+
+      const growthPlan: GrowthPlan = {
+        id: crypto.randomUUID(),
+        user_id: session.user.id,
+        focus_areas: planData.focus_areas,
+        goals: planData.goals.map((goal: any) => ({
           id: goal.id || crypto.randomUUID(),
           title: goal.title,
           description: goal.description,
           category: goal.category,
-          progress: goal.progress || 0,
-          status: goal.status || 'not_started',
-          suggested_actions: Array.isArray(goal.suggested_actions) ? goal.suggested_actions : [],
-          target_date: goal.target_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-        };
-      });
-
-      growthPlan = {
-        id: crypto.randomUUID(),
-        user_id: session.user.id,
-        focus_areas: planData.focus_areas,
-        goals: validatedGoals,
+          progress: 0,
+          status: 'not_started',
+          suggested_actions: goal.suggested_actions,
+          target_date: goal.target_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })),
         mood_patterns: planData.mood_patterns,
         recommendations: planData.recommendations,
+        insightImages,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // Log the final growth plan for debugging
-      console.log('Growth plan to be inserted:', JSON.stringify(growthPlan, null, 2));
-    } catch (e) {
-      console.error('Failed to parse or validate OpenAI response:', e);
-      console.error('OpenAI response:', analysis.choices[0].message.content);
+      // Store the growth plan in Supabase
+      const { data: insertedPlan, error: insertError } = await supabase
+        .from('growth_plans')
+        .upsert([growthPlan])
+        .select()
+        .single();
+
+      if (insertError) {
+        throw new Error(`Failed to save growth plan: ${insertError.message}`);
+      }
+
+      if (!insertedPlan) {
+        throw new Error('No data was returned from the insert operation');
+      }
+
+      const response = NextResponse.json({ growthPlan: insertedPlan });
+      
+      if (session) {
+        response.cookies.set('session', session.access_token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7 // 1 week
+        });
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error generating growth plan:', error);
       return NextResponse.json({ 
         error: 'Failed to generate growth plan',
-        details: e instanceof Error ? e.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error'
       }, { status: 500 });
     }
-
-    // Store the growth plan in Supabase
-    const { data: insertedPlan, error: insertError } = await supabase
-      .from('growth_plans')
-      .upsert([growthPlan])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      console.error('Growth plan data:', JSON.stringify(growthPlan, null, 2));
-      return NextResponse.json({ 
-        error: 'Failed to save growth plan',
-        details: insertError.message
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({ growthPlan: insertedPlan });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ 
@@ -200,23 +220,14 @@ export async function PATCH(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          async get(name: string) {
-            const cookie = await cookieStore.get(name);
-            return cookie?.value ?? '';
+          get(name: string) {
+            return request.cookies.get(name)?.value ?? '';
           },
-          async set(name: string, value: string, options: any) {
-            try {
-              await cookieStore.set(name, value, options);
-            } catch (error) {
-              // Ignore cookie setting errors in API routes
-            }
+          set(name: string, value: string, options: any) {
+            // Cookie setting will be handled by NextResponse
           },
-          async remove(name: string, options: any) {
-            try {
-              await cookieStore.delete(name);
-            } catch (error) {
-              // Ignore cookie removal errors in API routes
-            }
+          remove(name: string, options: any) {
+            // Cookie removal will be handled by NextResponse
           },
         },
       }
@@ -225,23 +236,19 @@ export async function PATCH(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Please log in to update your growth plan'
+      }, { status: 401 });
     }
 
-    // Parse and validate request body
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      console.error('Failed to parse request body:', e);
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-    }
-
-    const { goal_id, progress } = body;
+    const body = await request.json();
+    const { goal_id, progress } = body as UpdateGoalProgressPayload;
 
     if (!goal_id || typeof progress !== 'number' || progress < 0 || progress > 100) {
       return NextResponse.json({ 
-        error: 'Invalid goal_id or progress value' 
+        error: 'Invalid request body',
+        details: 'Please provide a valid goal_id and progress value (0-100)'
       }, { status: 400 });
     }
 
@@ -255,14 +262,14 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (fetchError) {
-      console.error('Fetch error:', fetchError);
       return NextResponse.json({ 
-        error: 'Failed to fetch growth plan' 
+        error: 'Failed to fetch growth plan',
+        details: fetchError.message
       }, { status: 500 });
     }
 
     // Update the goal progress
-    const updatedGoals = currentPlan.goals.map(goal =>
+    const updatedGoals = currentPlan.goals.map((goal: GrowthGoal) =>
       goal.id === goal_id
         ? { ...goal, progress, status: progress >= 100 ? 'completed' : 'in_progress' }
         : goal
@@ -278,13 +285,24 @@ export async function PATCH(request: NextRequest) {
       .eq('id', currentPlan.id);
 
     if (updateError) {
-      console.error('Update error:', updateError);
       return NextResponse.json({ 
-        error: 'Failed to update growth plan' 
+        error: 'Failed to update growth plan',
+        details: updateError.message
       }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+    
+    if (session) {
+      response.cookies.set('session', session.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 1 week
+      });
+    }
+
+    return response;
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ 
