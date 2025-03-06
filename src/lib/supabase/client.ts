@@ -158,6 +158,8 @@ export type Database = {
           insight: string;
           created_at: string;
           is_favorite: boolean;
+          image_url?: string | null;
+          language?: string;
         };
         Insert: {
           id?: string;
@@ -168,6 +170,8 @@ export type Database = {
           insight: string;
           created_at?: string;
           is_favorite?: boolean;
+          image_url?: string | null;
+          language?: string;
         };
         Update: {
           id?: string;
@@ -178,6 +182,8 @@ export type Database = {
           insight?: string;
           created_at?: string;
           is_favorite?: boolean;
+          image_url?: string | null;
+          language?: string;
         };
       };
       ai_generated_content: {

@@ -25,8 +25,48 @@ type QuranInsight = {
   insight: string;
   created_at: string;
   is_favorite: boolean;
-  image_url?: string;
+  image_url?: string | null;
 };
+
+const ImageDisplay = ({ imageUrl, surah, ayah }: { imageUrl: string, surah: number, ayah: number }) => (
+  <div className="mb-4 relative">
+    <div className="relative h-48 w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+      <Image
+        src={imageUrl}
+        alt={`Generated image for Surah ${surah}, Ayah ${ayah}`}
+        fill
+        className="object-cover transition-opacity duration-300"
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        priority={false}
+        loading="lazy"
+        onError={(e) => {
+          const img = e.target as HTMLImageElement;
+          img.src = 'https://placehold.co/600x400/f1f5f9/334155?text=Image+Unavailable';
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+      <a
+        href={imageUrl}
+        download={`quran-surah-${surah}-ayah-${ayah}.png`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-2 right-2 inline-flex items-center rounded-md bg-black/50 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-black/70 transition-colors"
+        onClick={(e) => {
+          e.preventDefault();
+          const link = document.createElement('a');
+          link.href = imageUrl;
+          link.download = `quran-surah-${surah}-ayah-${ayah}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }}
+      >
+        <FaImage className="mr-1.5 h-4 w-4" />
+        Download
+      </a>
+    </div>
+  </div>
+);
 
 export default function QuranInsightsPage() {
   const [insights, setInsights] = useState<QuranInsight[]>([]);
@@ -36,7 +76,6 @@ export default function QuranInsightsPage() {
   const [quranText, setQuranText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [maxVerses, setMaxVerses] = useState(0);
   const [selectedSurah, setSelectedSurah] = useState<QuranSurah | null>(null);
@@ -222,8 +261,6 @@ export default function QuranInsightsPage() {
                 item.id === data[0].id ? { ...item, image_url: imageUrl } : item
               )
             );
-
-            setGeneratedImageUrl(imageUrl);
           }
         } catch (imageError) {
           console.error('Error generating image:', imageError);
@@ -261,8 +298,6 @@ export default function QuranInsightsPage() {
       if (!imageUrl) {
         throw new Error('Failed to generate image');
       }
-
-      setGeneratedImageUrl(imageUrl);
 
       // Save the generated content to the database
       const { data: userData } = await supabase.auth.getUser();
@@ -459,31 +494,6 @@ export default function QuranInsightsPage() {
         </div>
       </BentoCard>
 
-      {generatedImageUrl && (
-        <BentoCard name="Generated Poster" Icon={FaImage}>
-          <div className="mt-4 flex justify-center">
-            <div className="relative h-80 w-80 overflow-hidden rounded-lg">
-              <Image
-                src={generatedImageUrl}
-                alt="Generated Quran Poster"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-          <div className="mt-4 flex justify-center">
-            <a
-              href={generatedImageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            >
-              Download Image
-            </a>
-          </div>
-        </BentoCard>
-      )}
-
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Your Insights</h2>
 
@@ -515,35 +525,11 @@ export default function QuranInsightsPage() {
                 </div>
                 <div className="mt-4 max-h-[32rem] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
                   {insight.image_url && (
-                    <div className="mb-4 relative">
-                      <div className="relative h-48 w-full overflow-hidden rounded-lg">
-                        <Image
-                          src={insight.image_url || ''}
-                          alt={`Generated image for Surah ${insight.surah}, Ayah ${insight.ayah}`}
-                          fill
-                          className="object-cover"
-                        />
-                        <a
-                          href={insight.image_url || ''}
-                          download={`quran-surah-${insight.surah}-ayah-${insight.ayah}.png`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute bottom-2 right-2 inline-flex items-center rounded-md bg-black/50 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-black/70 transition-colors"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const link = document.createElement('a');
-                            link.href = insight.image_url || '';
-                            link.download = `quran-surah-${insight.surah}-ayah-${insight.ayah}.png`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                        >
-                          <FaImage className="mr-1.5 h-4 w-4" />
-                          Download
-                        </a>
-                      </div>
-                    </div>
+                    <ImageDisplay
+                      imageUrl={insight.image_url}
+                      surah={insight.surah}
+                      ayah={insight.ayah}
+                    />
                   )}
                   <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
                     <p className="text-gray-800 dark:text-gray-200" dir="rtl" lang="ar">{insight.text}</p>
