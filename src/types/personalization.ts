@@ -1,4 +1,3 @@
-
 export interface UserPreferences {
   knowledgeLevel: 'beginner' | 'intermediate' | 'advanced';
   interests: string[];
@@ -14,14 +13,36 @@ export interface UserPreferences {
 
 export interface MoodEntry {
   id: string;
-  userId: string;
-  date: string;
-  mood: 'excellent' | 'good' | 'neutral' | 'struggling' | 'difficult';
-  notes?: string;
-  practices: {
-    practiceName: string;
-    completed: boolean;
-  }[];
+  user_id: string;
+  mood_rating: number;
+  mood_description: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MoodAnalysis {
+  id: string;
+  mood_entry_id: string;
+  content: {
+    sentiment: string;
+    themes: string[];
+    insights: string[];
+    recommendations: string[];
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MoodEntryDB {
+  id: string;
+  user_id: string;
+  mood_rating: number;
+  mood_description: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  analysis?: MoodAnalysis;
 }
 
 export interface GrowthPlan {
@@ -56,4 +77,29 @@ export interface ContentRecommendation {
   durationMinutes?: number;
   knowledgeLevel: 'beginner' | 'intermediate' | 'advanced';
   tags: string[];
+}
+
+export interface ProcessedMoodEntry {
+  id: string;
+  mood_description: string;
+  created_at: string;
+  analysis: {
+    primaryEmotion?: string;
+    spiritualDimension?: string;
+    category?: string;
+    intensity?: number;
+    triggers?: string[];
+    suggestions?: string[];
+  } | null;
+}
+
+export interface PersonalizationSettings {
+  id: string;
+  user_id: string;
+  allow_data_collection: boolean;
+  daily_reflection_reminders: boolean;
+  weekly_growth_updates: boolean;
+  content_recommendation_alerts: boolean;
+  created_at: string;
+  updated_at: string;
 } 

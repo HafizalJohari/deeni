@@ -103,7 +103,7 @@ async function generateQuranInsight(language) {
     console.log(`Generating Quran insight in ${language}...`);
     
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
@@ -138,7 +138,7 @@ async function generateHadithInsight(language) {
     console.log(`Generating Hadith insight in ${language}...`);
     
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',

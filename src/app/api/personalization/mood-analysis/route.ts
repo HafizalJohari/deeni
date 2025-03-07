@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Call OpenAI API
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: 'You are an AI assistant specializing in analyzing spiritual well-being patterns.' },
         { role: 'user', content: prompt }

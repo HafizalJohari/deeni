@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import AppSidebar from '@/components/ui/AppSidebar';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'Personalization | Deeni',
@@ -24,6 +25,7 @@ export default function StandalonePersonalizationLayout({
           </div>
         </main>
       </div>
+      <Toaster richColors position="bottom-right" />
     </div>
   );
 } 

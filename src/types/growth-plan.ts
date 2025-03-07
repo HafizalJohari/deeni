@@ -25,13 +25,13 @@ export interface InsightImage {
 export interface GrowthPlan {
   id: string;
   user_id: string;
+  title: string;
+  description: string;
+  start_date: string;
+  end_date: string | null;
+  status: 'active' | 'completed' | 'paused';
   created_at: string;
   updated_at: string;
-  goals: GrowthGoal[];
-  mood_patterns: MoodPattern[];
-  recommendations: string[];
-  focus_areas: string[];
-  insightImages?: InsightImage[];
 }
 
 export type GoalCategory = 'Prayer' | 'Quran' | 'Dhikr' | 'Fasting' | 'Community' | 'Knowledge';

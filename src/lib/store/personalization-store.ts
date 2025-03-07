@@ -4,7 +4,8 @@ import {
   UserPreferences, 
   GrowthPlan, 
   MoodEntry, 
-  ContentRecommendation 
+  ContentRecommendation,
+  PersonalizationSettings 
 } from '../../types/personalization';
 
 interface PersonalizationState {
@@ -12,6 +13,7 @@ interface PersonalizationState {
   currentGrowthPlan: GrowthPlan | null;
   moodEntries: MoodEntry[];
   contentRecommendations: ContentRecommendation[];
+  personalizationSettings: PersonalizationSettings | null;
   isLoading: boolean;
   error: string | null;
   
@@ -23,6 +25,8 @@ interface PersonalizationState {
   deleteMoodEntry: (id: string) => void;
   setContentRecommendations: (recommendations: ContentRecommendation[]) => void;
   updateGrowthGoalStatus: (goalId: string, completed: boolean) => void;
+  setPersonalizationSettings: (settings: PersonalizationSettings) => void;
+  updatePersonalizationSettings: (updates: Partial<PersonalizationSettings>) => void;
   clearError: () => void;
   setLoading: (isLoading: boolean) => void;
 }
@@ -34,6 +38,7 @@ export const usePersonalizationStore = create<PersonalizationState>()(
       currentGrowthPlan: null,
       moodEntries: [],
       contentRecommendations: [],
+      personalizationSettings: null,
       isLoading: false,
       error: null,
       
@@ -58,6 +63,16 @@ export const usePersonalizationStore = create<PersonalizationState>()(
       setContentRecommendations: (recommendations) => set({ 
         contentRecommendations: recommendations 
       }),
+      
+      setPersonalizationSettings: (settings) => set({
+        personalizationSettings: settings
+      }),
+      
+      updatePersonalizationSettings: (updates) => set((state) => ({
+        personalizationSettings: state.personalizationSettings 
+          ? { ...state.personalizationSettings, ...updates }
+          : null
+      })),
       
       updateGrowthGoalStatus: (goalId, completed) => set((state) => {
         if (!state.currentGrowthPlan) return state;
@@ -88,6 +103,7 @@ export const usePersonalizationStore = create<PersonalizationState>()(
       partialize: (state) => ({
         userPreferences: state.userPreferences,
         moodEntries: state.moodEntries,
+        personalizationSettings: state.personalizationSettings,
       }),
       storage: createJSONStorage(() => {
         // Check if window is defined (browser) or not (SSR)

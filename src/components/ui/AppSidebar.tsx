@@ -13,7 +13,7 @@ import {
   User,
   Menu,
   X,
-  Heart
+  Heart,
 } from 'lucide-react';
 
 interface SidebarLinkType {
@@ -26,7 +26,7 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   
-  const sidebarLinks: SidebarLinkType[] = [
+  const mainLinks: SidebarLinkType[] = [
     {
       icon: <Home className="h-5 w-5" />,
       label: 'Dashboard',
@@ -52,6 +52,9 @@ export default function AppSidebar() {
       label: 'Personalization',
       href: '/standalone-personalization',
     },
+  ];
+
+  const bottomLinks: SidebarLinkType[] = [
     {
       icon: <User className="h-5 w-5" />,
       label: 'Profile',
@@ -60,12 +63,39 @@ export default function AppSidebar() {
     {
       icon: <Settings className="h-5 w-5" />,
       label: 'Settings',
-      href: '/settings',
+      href: '/standalone-personalization?tab=settings',
     },
   ];
 
   const toggleMobileMenu = () => {
     setIsMobileOpen(!isMobileOpen);
+  };
+
+  const renderLinks = (links: SidebarLinkType[]) => {
+    return links.map((link, index) => {
+      const isActive = pathname === link.href;
+      return (
+        <Link
+          key={index}
+          href={link.href}
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-green-50 text-green-600"
+              : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+          )}
+          onClick={isMobileOpen ? toggleMobileMenu : undefined}
+        >
+          <span className={cn(
+            "flex-shrink-0",
+            isActive ? "text-green-600" : "text-gray-500"
+          )}>
+            {link.icon}
+          </span>
+          <span className="flex-1">{link.label}</span>
+        </Link>
+      );
+    });
   };
 
   return (
@@ -100,31 +130,16 @@ export default function AppSidebar() {
             </button>
           </div>
 
-          <div className="flex-1 space-y-1">
-            {sidebarLinks.map((link, index) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={index}
-                  href={link.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-green-50 text-green-600"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                  )}
-                  onClick={toggleMobileMenu}
-                >
-                  <span className={cn(
-                    "flex-shrink-0",
-                    isActive ? "text-green-600" : "text-gray-500"
-                  )}>
-                    {link.icon}
-                  </span>
-                  <span className="flex-1">{link.label}</span>
-                </Link>
-              );
-            })}
+          <div className="flex flex-1 flex-col justify-between">
+            <nav className="flex-1 space-y-1">
+              {renderLinks(mainLinks)}
+            </nav>
+            <div>
+              <div className="my-4 h-px bg-gray-200" />
+              <nav className="space-y-1">
+                {renderLinks(bottomLinks)}
+              </nav>
+            </div>
           </div>
         </div>
       </div>
@@ -135,32 +150,16 @@ export default function AppSidebar() {
           <span className="text-2xl font-bold text-green-600">Deeni by SAFR+</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-2">
+        <div className="flex flex-1 flex-col justify-between overflow-y-auto px-3 py-2">
           <nav className="flex flex-col gap-1">
-            {sidebarLinks.map((link, index) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={index}
-                  href={link.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-green-50 text-green-600"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                  )}
-                >
-                  <span className={cn(
-                    "flex-shrink-0",
-                    isActive ? "text-green-600" : "text-gray-500"
-                  )}>
-                    {link.icon}
-                  </span>
-                  <span className="flex-1">{link.label}</span>
-                </Link>
-              );
-            })}
+            {renderLinks(mainLinks)}
           </nav>
+          <div>
+            <div className="my-4 h-px bg-gray-200" />
+            <nav className="flex flex-col gap-1">
+              {renderLinks(bottomLinks)}
+            </nav>
+          </div>
         </div>
       </div>
     </>
