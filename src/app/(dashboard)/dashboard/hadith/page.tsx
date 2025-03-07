@@ -8,7 +8,6 @@ import { FaSearch, FaStar, FaRegStar, FaBook, FaSpinner, FaImage, FaCopy, FaChec
 import Link from 'next/link';
 import Image from 'next/image';
 import { hadithGuidance, getRandomGuidance } from '@/lib/islamic-guidance';
-import Tooltip from '@/components/ui/Tooltip';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { hadithCollections, getCollectionName } from '@/lib/constants/hadith';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -267,15 +266,6 @@ export default function HadithInsightsPage() {
       <div className="flex flex-col gap-2 mb-8">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold">Hadith Insights</h1>
-          <Tooltip
-            content={
-              <div>
-                <h3 className="font-bold mb-1">{randomHadithGuidance.title}</h3>
-                <p>{randomHadithGuidance.content}</p>
-              </div>
-            }
-            source={randomHadithGuidance.source}
-          />
         </div>
         <p className="text-muted-foreground">
           Explore and reflect on the teachings of the Prophet Muhammad (ﷺ)

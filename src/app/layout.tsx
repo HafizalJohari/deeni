@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { FloatingPrayerTime } from '@/components/ui/FloatingPrayerTime'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -13,6 +14,11 @@ export const metadata: Metadata = {
   description: "A modern platform for learning and understanding Islam",
   keywords: ["Islamic learning", "Quran", "Hadith", "Islamic education", "Muslim app", "Islamic app"],
   authors: [{ name: "SAFR+" }],
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
   openGraph: {
     title: "Deeni - Islamic Learning Platform",
     description: "A modern platform for learning and understanding Islam",
@@ -45,7 +51,7 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head />
       <body className={`${inter.className} antialiased min-h-screen bg-background font-sans`}>
         <ThemeProvider
@@ -55,6 +61,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
           disableTransitionOnChange
         >
           {children}
+          <FloatingPrayerTime />
         </ThemeProvider>
       </body>
     </html>

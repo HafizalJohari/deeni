@@ -11,7 +11,7 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
@@ -79,6 +79,11 @@
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
   }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px; /* Adjust based on your header height */
+  }
 }
 
 @layer base {
@@ -135,10 +140,6 @@
 
 .animate-leave {
   animation: leave 0.3s ease-in forwards;
-}
-
-html {
-  scroll-behavior: smooth;
 }
 
 /* Animations for ping effect */

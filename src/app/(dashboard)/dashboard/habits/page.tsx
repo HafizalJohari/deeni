@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { FaPlus, FaCheck, FaRegClock, FaCalendarAlt, FaEllipsisH } from 'react-icons/fa';
 import { habitGuidance, getRandomGuidance } from '@/lib/islamic-guidance';
-import Tooltip from '@/components/ui/Tooltip';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
@@ -173,15 +172,6 @@ export default function HabitsPage() {
         <div>
           <div className="flex items-center mb-4">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Habit Tracker</h1>
-            <Tooltip 
-              content={
-                <div>
-                  <h3 className="font-bold mb-1">{randomHabitGuidance.title}</h3>
-                  <p>{randomHabitGuidance.content}</p>
-                </div>
-              } 
-              source={randomHabitGuidance.source}
-            />
           </div>
           <p className="mt-1 text-gray-600">Track your good deeds and build consistency</p>
         </div>
@@ -194,11 +184,6 @@ export default function HabitsPage() {
               <FaPlus className="mr-2 h-4 w-4" />
               Add New Habit
             </Link>
-            <Tooltip 
-              content="The Quran states: 'Indeed, Allah will not change the condition of a people until they change what is in themselves.'" 
-              source="Quran: Surah Ar-Ra'd 13:11"
-              position="bottom"
-            />
           </div>
         </div>
       </div>
@@ -326,35 +311,23 @@ export default function HabitsPage() {
 
                 <div className="mt-4">
                   {habit.is_completed ? (
-                    <Tooltip 
-                      content="Consistency is key in developing good habits. The Prophet (ﷺ) emphasized the importance of consistency in all good deeds." 
-                      source="Islamic Tradition"
-                      position="left"
+                    <button
+                      disabled
+                      className="flex w-full items-center justify-center rounded-md bg-green-100 px-4 py-2 text-sm font-medium text-green-800"
                     >
-                      <button
-                        disabled
-                        className="flex w-full items-center justify-center rounded-md bg-green-100 px-4 py-2 text-sm font-medium text-green-800"
-                      >
-                        <FaCheck className="mr-2 h-4 w-4" />
-                        Completed
-                      </button>
-                    </Tooltip>
+                      <FaCheck className="mr-2 h-4 w-4" />
+                      Completed
+                    </button>
                   ) : (
-                    <Tooltip 
-                      content="Consistency is key in developing good habits. The Prophet (ﷺ) emphasized the importance of consistency in all good deeds." 
-                      source="Islamic Tradition"
-                      position="left"
+                    <Button
+                      onClick={() => handleLogProgressClick(habit.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 justify-center"
                     >
-                      <Button
-                        onClick={() => handleLogProgressClick(habit.id)}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 justify-center"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Log Progress
-                      </Button>
-                    </Tooltip>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Log Progress
+                    </Button>
                   )}
                 </div>
               </div>

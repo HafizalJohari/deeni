@@ -8,7 +8,6 @@ import { FaSearch, FaStar, FaRegStar, FaQuran, FaSpinner, FaImage, FaLightbulb, 
 import Link from 'next/link';
 import Image from 'next/image';
 import { quranGuidance, getRandomGuidance } from '@/lib/islamic-guidance';
-import Tooltip from '@/components/ui/Tooltip';
 import { QuranSurahDropdown } from '@/components/ui/QuranSurahDropdown';
 import { QuranSurah, getMaxVersesForSurah } from '@/lib/quran-data';
 import { RecommendedVersesPanel } from '@/components/ui/RecommendedVersesPanel';
@@ -365,17 +364,8 @@ export default function QuranInsightsPage() {
       <div>
         <div className="flex items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Quran Insights</h1>
-          <Tooltip 
-            content={
-              <div>
-                <h3 className="font-bold mb-1">{randomQuranGuidance.title}</h3>
-                <p>{randomQuranGuidance.content}</p>
-              </div>
-            } 
-            source={randomQuranGuidance.source}
-          />
         </div>
-        <p className="mt-1 text-gray-600">Explore and reflect on verses from the Quran</p>
+        <p className="mt-1 text-gray-600">Generate AI-powered insights from Quranic verses</p>
       </div>
 
       {/* Recommended Verses Panel */}
@@ -385,11 +375,6 @@ export default function QuranInsightsPage() {
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="flex items-center mb-2">
             <label className="mr-2 font-medium text-gray-700 dark:text-gray-300">Select Surah:</label>
-            <Tooltip 
-              content="The Quran contains 114 surahs (chapters). Regular reflection on the Quran is recommended as mentioned in Surah Muhammad: 'Then do they not reflect upon the Quran, or are there locks upon their hearts?'" 
-              source="Quran: Surah Muhammad 47:24"
-              position="right"
-            />
           </div>
           <div>
             <label htmlFor="surah" className="block text-sm font-medium text-gray-700">
@@ -485,11 +470,6 @@ export default function QuranInsightsPage() {
                 </>
               )}
             </button>
-            <Tooltip 
-              content="The Prophet (ﷺ) said: 'The best among you are those who learn the Quran and teach it to others.'" 
-              source="Hadith: Sahih Bukhari"
-              position="bottom"
-            />
           </div>
         </div>
       </BentoCard>
