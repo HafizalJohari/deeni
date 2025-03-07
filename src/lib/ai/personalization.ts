@@ -165,7 +165,7 @@ export const generateGrowthPlan = async (
     // In a real application, this would be an API call to a server-side endpoint
     // that handles the OpenAI API call
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: 'You are an AI assistant specializing in Islamic spiritual growth guidance.' },
         { role: 'user', content: `Generate a personalized Islamic ${planType} growth plan` }

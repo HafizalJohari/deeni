@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       
       For each recommendation, provide:
       1. Title
-      2. Type (e.g., Article, Video, Quran chapter, Hadith, Dua)
+      2. Type (e.g., Article, Quran chapter, Hadith, Dua)
       3. Brief description
       4. Reason why it's recommended based on their current mood and preferences
       
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "You are a knowledgeable Islamic scholar and spiritual guide." },
         { role: "user", content: prompt }

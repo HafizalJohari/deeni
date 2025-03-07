@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { GrowthPlan, GrowthGoal, UpdateGoalProgressPayload } from '@/types/growth-plan';
+import { MoodEntryDB, ProcessedMoodEntry } from '@/types/personalization';
 import { generateInsightImage } from '@/services/image-generation';
 
 // Initialize OpenAI client
@@ -11,25 +12,55 @@ const openai = new OpenAI({
 });
 
 const validateGrowthPlanData = (data: any): data is GrowthPlan => {
-  if (!data || typeof data !== 'object') return false;
-  if (!Array.isArray(data.focus_areas)) return false;
-  if (!Array.isArray(data.goals)) return false;
-  if (!Array.isArray(data.mood_patterns)) return false;
-  if (!Array.isArray(data.recommendations)) return false;
-  
-  // Validate goals structure
-  return data.goals.every((goal: any) => (
-    goal.title &&
-    goal.description &&
-    goal.category &&
-    typeof goal.progress === 'number' &&
-    Array.isArray(goal.suggested_actions)
-  ));
+  try {
+    if (!data || typeof data !== 'object') return false;
+    
+    // Required arrays
+    const requiredArrays = ['focus_areas', 'goals', 'mood_patterns', 'recommendations'];
+    for (const arr of requiredArrays) {
+      if (!Array.isArray(data[arr])) {
+        console.error(`Missing or invalid ${arr} array in growth plan data`);
+        return false;
+      }
+    }
+    
+    // Validate goals structure
+    if (!data.goals.every((goal: any) => {
+      const requiredFields = ['title', 'description', 'category', 'progress', 'suggested_actions'];
+      return requiredFields.every(field => {
+        const hasField = goal.hasOwnProperty(field);
+        if (!hasField) {
+          console.error(`Missing required field ${field} in goal`);
+        }
+        return hasField;
+      });
+    })) {
+      return false;
+    }
+
+    // Validate mood patterns structure
+    if (!data.mood_patterns.every((pattern: any) => {
+      const requiredFields = ['category', 'frequency', 'insights'];
+      return requiredFields.every(field => {
+        const hasField = pattern.hasOwnProperty(field);
+        if (!hasField) {
+          console.error(`Missing required field ${field} in mood pattern`);
+        }
+        return hasField;
+      });
+    })) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error validating growth plan data:', error);
+    return false;
+  }
 };
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -48,81 +79,106 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
+    // Get authenticated user using getUser() for security
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (userError || !user) {
+      console.error('Authentication error:', userError);
       return NextResponse.json({ 
-        error: 'Unauthorized',
-        details: 'Please log in to access your growth plan'
+        error: 'Authentication error',
+        details: 'Failed to verify user authentication'
       }, { status: 401 });
     }
 
-    // Fetch user's mood entries
+    // First, check if there's an existing active growth plan
+    const { data: existingPlan, error: planError } = await supabase
+      .from('growth_plans')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (planError && planError.code !== 'PGRST116') { // Ignore "no rows returned" error
+      console.error('Error fetching existing plan:', planError);
+      return NextResponse.json({ 
+        error: 'Database error',
+        details: 'Failed to fetch existing growth plan'
+      }, { status: 500 });
+    }
+
+    // If we have an active plan, return it
+    if (existingPlan) {
+      return NextResponse.json({ growthPlan: existingPlan });
+    }
+
+    // Fetch user's mood entries with analysis from the last 30 days
     const { data: moodEntries, error: moodError } = await supabase
       .from('mood_entries')
       .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(30);
+      .eq('user_id', user.id)
+      .not('analysis', 'is', null)
+      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false });
 
     if (moodError) {
       console.error('Error fetching mood entries:', moodError);
       return NextResponse.json({ 
-        error: 'Failed to fetch mood entries',
-        details: moodError.message
+        error: 'Database error',
+        details: 'Failed to fetch mood entries: ' + moodError.message
       }, { status: 500 });
     }
 
-    if (!moodEntries || moodEntries.length === 0) {
+    // Check if there are at least 5 mood entries with analysis
+    if (!moodEntries || moodEntries.length < 5) {
+      const entriesNeeded = 5 - (moodEntries?.length || 0);
       return NextResponse.json({ 
-        error: 'No mood entries found',
-        details: 'Please add some mood entries before generating a growth plan'
-      }, { status: 404 });
+        error: 'Insufficient data',
+        details: `Please submit ${entriesNeeded} more mood ${entriesNeeded === 1 ? 'entry' : 'entries'} before generating a growth plan. This helps us create a more personalized plan for your spiritual growth.`,
+        entriesNeeded
+      }, { status: 400 });
     }
 
     try {
-      // Analyze mood patterns using OpenAI
+      // Analyze mood patterns and generate growth plan using OpenAI
       const analysis = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are an expert in Islamic spiritual development and emotional analysis. Analyze the following mood entries and create a comprehensive growth plan."
+            content: `You are an expert in Islamic spiritual development and emotional analysis. 
+            Your task is to analyze mood entries and their analysis to create a personalized growth plan that helps 
+            Muslims improve their spiritual connection and emotional wellbeing.
+            
+            Consider:
+            1. Patterns in spiritual states and emotions
+            2. Common themes in the analysis
+            3. Areas needing improvement
+            4. Practical, achievable goals
+            5. Islamic principles and teachings`
           },
           {
             role: "user",
-            content: `Based on these mood entries: ${JSON.stringify(moodEntries)}, create a growth plan that includes:
-            1. Focus areas for spiritual development
-            2. Specific goals with suggested actions
-            3. Analysis of mood patterns and their spiritual significance
-            4. Personalized recommendations
+            content: `Based on these mood entries and their analysis: ${JSON.stringify(moodEntries, null, 2)}, 
+            create a comprehensive growth plan that includes:
             
-            Return a JSON object with this structure:
+            1. A title that reflects the main focus or theme
+            2. A description of the overall plan and its objectives
+            3. A start date (today) and end date (30 days from now)
+            
+            Return the response in this JSON structure:
             {
-              "focus_areas": ["area1", "area2", ...],
-              "goals": [
-                {
-                  "id": "unique_string",
-                  "title": "goal title",
-                  "description": "detailed description",
-                  "category": "Prayer|Quran|Dhikr|Fasting|Community|Knowledge",
-                  "progress": 0,
-                  "status": "not_started",
-                  "suggested_actions": ["action1", "action2", ...],
-                  "target_date": "ISO date string"
-                }
-              ],
-              "mood_patterns": [
-                {
-                  "category": "pattern category",
-                  "frequency": "percentage number",
-                  "insights": ["insight1", "insight2", ...]
-                }
-              ],
-              "recommendations": ["recommendation1", "recommendation2", ...]
-            }`
+              "title": "string",
+              "description": "string",
+              "start_date": "YYYY-MM-DD",
+              "end_date": "YYYY-MM-DD"
+            }
+            
+            The plan should be practical, achievable, and grounded in Islamic teachings.`
           }
-        ]
+        ],
+        response_format: { type: "json_object" }
       });
 
       const content = analysis.choices[0].message.content;
@@ -131,48 +187,21 @@ export async function GET(request: NextRequest) {
       }
 
       const planData = JSON.parse(content);
-      if (!validateGrowthPlanData(planData)) {
-        throw new Error('Invalid growth plan data structure');
-      }
-
-      // Generate images for insights
-      const insightImages = [];
-      for (const pattern of planData.mood_patterns) {
-        if (pattern.category === 'Quran' || pattern.category === 'Hadith') {
-          for (const insight of pattern.insights) {
-            const image = await generateInsightImage(insight, pattern.category);
-            if (image) {
-              insightImages.push(image);
-            }
-          }
-        }
-      }
-
-      const growthPlan: GrowthPlan = {
-        id: crypto.randomUUID(),
-        user_id: session.user.id,
-        focus_areas: planData.focus_areas,
-        goals: planData.goals.map((goal: any) => ({
-          id: goal.id || crypto.randomUUID(),
-          title: goal.title,
-          description: goal.description,
-          category: goal.category,
-          progress: 0,
-          status: 'not_started',
-          suggested_actions: goal.suggested_actions,
-          target_date: goal.target_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        })),
-        mood_patterns: planData.mood_patterns,
-        recommendations: planData.recommendations,
-        insightImages,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      
+      // Create the growth plan
+      const growthPlan = {
+        user_id: user.id,
+        title: planData.title,
+        description: planData.description,
+        start_date: planData.start_date,
+        end_date: planData.end_date,
+        status: 'active'
       };
 
       // Store the growth plan in Supabase
       const { data: insertedPlan, error: insertError } = await supabase
         .from('growth_plans')
-        .upsert([growthPlan])
+        .insert([growthPlan])
         .select()
         .single();
 
@@ -180,22 +209,7 @@ export async function GET(request: NextRequest) {
         throw new Error(`Failed to save growth plan: ${insertError.message}`);
       }
 
-      if (!insertedPlan) {
-        throw new Error('No data was returned from the insert operation');
-      }
-
-      const response = NextResponse.json({ growthPlan: insertedPlan });
-      
-      if (session) {
-        response.cookies.set('session', session.access_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7 // 1 week
-        });
-      }
-
-      return response;
+      return NextResponse.json({ growthPlan: insertedPlan });
     } catch (error) {
       console.error('Error generating growth plan:', error);
       return NextResponse.json({ 
@@ -214,7 +228,6 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -233,9 +246,9 @@ export async function PATCH(request: NextRequest) {
       }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ 
         error: 'Unauthorized',
         details: 'Please log in to update your growth plan'
@@ -243,46 +256,24 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { goal_id, progress } = body as UpdateGoalProgressPayload;
+    const { plan_id, status } = body;
 
-    if (!goal_id || typeof progress !== 'number' || progress < 0 || progress > 100) {
+    if (!plan_id || !status || !['active', 'completed', 'paused'].includes(status)) {
       return NextResponse.json({ 
         error: 'Invalid request body',
-        details: 'Please provide a valid goal_id and progress value (0-100)'
+        details: 'Please provide a valid plan_id and status (active, completed, or paused)'
       }, { status: 400 });
     }
 
-    // Fetch the current growth plan
-    const { data: currentPlan, error: fetchError } = await supabase
-      .from('growth_plans')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (fetchError) {
-      return NextResponse.json({ 
-        error: 'Failed to fetch growth plan',
-        details: fetchError.message
-      }, { status: 500 });
-    }
-
-    // Update the goal progress
-    const updatedGoals = currentPlan.goals.map((goal: GrowthGoal) =>
-      goal.id === goal_id
-        ? { ...goal, progress, status: progress >= 100 ? 'completed' : 'in_progress' }
-        : goal
-    );
-
-    // Update the growth plan
+    // Update the growth plan status
     const { error: updateError } = await supabase
       .from('growth_plans')
       .update({
-        goals: updatedGoals,
+        status,
         updated_at: new Date().toISOString()
       })
-      .eq('id', currentPlan.id);
+      .eq('id', plan_id)
+      .eq('user_id', user.id);
 
     if (updateError) {
       return NextResponse.json({ 
@@ -291,18 +282,7 @@ export async function PATCH(request: NextRequest) {
       }, { status: 500 });
     }
 
-    const response = NextResponse.json({ success: true });
-    
-    if (session) {
-      response.cookies.set('session', session.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 1 week
-      });
-    }
-
-    return response;
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ 
