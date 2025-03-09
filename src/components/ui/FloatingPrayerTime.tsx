@@ -348,7 +348,7 @@ export function FloatingPrayerTime() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium">Prayer Times</span>
+                <span className="text-sm font-medium hidden sm:inline">Prayer Times</span>
               </div>
               <button 
                 onClick={(e) => {

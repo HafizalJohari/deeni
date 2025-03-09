@@ -86,7 +86,7 @@ Here's how the PageHeaderCard is implemented in the Habits Tracker page:
   actions={
     <Link href="/dashboard/habits/new" className="inline-flex items-center">
       <Button size="sm">
-        <FaPlus className="mr-2 h-3 w-3" />
+        <FaPlus className="mr-2 h-3 w-3 text-green-600" />
         New Habit
       </Button>
     </Link>

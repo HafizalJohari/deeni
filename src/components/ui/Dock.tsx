@@ -34,6 +34,7 @@ import {
   User,
   Heart,
   LogOut,
+  GraduationCap,
 } from 'lucide-react';
 
 const DOCK_HEIGHT = 128;
@@ -122,7 +123,7 @@ function Dock({
         height: height,
         scrollbarWidth: 'none',
       }}
-      className='fixed bottom-16 left-0 right-0 flex items-end justify-center overflow-x-auto z-50'
+      className='fixed bottom-4 sm:bottom-16 left-0 right-0 flex items-end justify-center overflow-x-auto z-50'
     >
       <motion.div
         onMouseMove={({ pageX }) => {
@@ -134,7 +135,7 @@ function Dock({
           mouseX.set(Infinity);
         }}
         className={cn(
-          'mx-auto flex w-fit gap-6 rounded-2xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md px-6 py-3 shadow-lg border border-gray-200/50 dark:border-neutral-800/50',
+          'mx-auto flex w-fit gap-2 sm:gap-6 rounded-2xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shadow-lg border border-gray-200/50 dark:border-neutral-800/50',
           className
         )}
         style={{ height: panelHeight }}
@@ -253,7 +254,7 @@ function DockIcon({ children, className, width, isHovered, style, ...rest }: Doc
         ...style,
         width: widthTransform 
       }}
-      className={cn('flex items-center justify-center', className)}
+      className={cn('flex items-center justify-center scale-90 sm:scale-100', className)}
     >
       {children}
     </motion.div>
@@ -284,6 +285,11 @@ export function AppDock() {
       icon: <Calendar className="h-5 w-5" />,
       label: 'Habits',
       href: '/dashboard/habits',
+    },
+    {
+      icon: <GraduationCap className="h-5 w-5" />,
+      label: 'Learn',
+      href: '/dashboard/learn',
     },
     {
       icon: <BookOpen className="h-5 w-5" />,
@@ -328,7 +334,7 @@ export function AppDock() {
           >
             <DockIcon>
               <div className={cn(
-                'p-3 rounded-xl bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-neutral-700/50 transition-colors duration-200',
+                'p-2 sm:p-3 rounded-xl bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-neutral-700/50 transition-colors duration-200',
                 isActive && 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
               )}>
                 {link.icon}
