@@ -14,6 +14,13 @@ import { RecommendedVersesPanel } from '@/components/ui/RecommendedVersesPanel';
 import { fetchQuranVerse, getPlaceholderVerseText } from '@/lib/quran-api';
 import { BentoCard, BentoGrid } from '@/components/ui/bento';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { motion } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
+import { AuthGuard } from '@/components/auth/AuthGuard';
+import AuthDebugger from '@/components/auth/AuthDebugger';
+import { AnimatedGridPattern } from '@/components/ui/AnimatedGridPattern';
+import { PageHeaderCard } from '@/components/ui/PageHeaderCard';
+import { Button } from '@/components/ui/button';
 
 type QuranInsight = {
   id: string;
@@ -82,6 +89,30 @@ export default function QuranInsightsPage() {
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
   const [copiedInsightId, setCopiedInsightId] = useState<string | null>(null);
   const { insightLanguage } = useLanguage();
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) return;
+
+        // Get user profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userData.user.id)
+          .single();
+
+        if (profileError) throw profileError;
+        setUserProfile(profileData);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     const fetchInsights = async () => {
@@ -351,6 +382,20 @@ export default function QuranInsightsPage() {
     ? Array.from({ length: maxVerses }, (_, i) => i + 1) 
     : [];
 
+  useEffect(() => {
+    const checkAuthState = async () => {
+      console.log('[Quran Page] Checking auth state on mount');
+      const { data, error } = await supabase.auth.getSession();
+      console.log('[Quran Page] Session check result:', { 
+        hasSession: !!data.session,
+        user: data.session?.user?.id || 'none',
+        error: error ? error.message : 'none'
+      });
+    };
+    
+    checkAuthState();
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -360,183 +405,213 @@ export default function QuranInsightsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Quran Insights</h1>
-        </div>
-        <p className="mt-1 text-gray-600">Generate AI-powered insights from Quranic verses</p>
-      </div>
+    <AuthGuard>
+      <div className="container mx-auto py-6 px-4 sm:px-6 space-y-6 relative min-h-screen isolate">
+        <AnimatedGridPattern 
+          className="fixed inset-0 -z-10 opacity-40 dark:opacity-30 animate-fade-in pointer-events-none select-none" 
+          width={32} 
+          height={32} 
+          strokeDasharray={4} 
+          numSquares={40}
+          maxOpacity={0.4}
+          duration={5}
+          repeatDelay={1}
+        />
+        
+        <PageHeaderCard
+          title="Quran Insights"
+          description="Generate AI-powered insights from Quranic verses"
+          icon={FaQuran}
+          actions={
+            <Badge variant="outline" className="text-sm font-medium">
+              {userProfile?.level ? `Level ${userProfile.level}` : 'Level 1'}
+            </Badge>
+          }
+        />
 
-      {/* Recommended Verses Panel */}
-      <RecommendedVersesPanel onSelectVerse={handleVerseSelect} />
+        <div className="relative z-3 space-y-3">
+          {/* Recommended Verses Panel */}
+          <div className="mt-10">
+            <RecommendedVersesPanel onSelectVerse={handleVerseSelect} />
+          </div>
 
-      <BentoCard name="Generate New Insight" Icon={FaQuran}>
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="flex items-center mb-2">
-            <label className="mr-2 font-medium text-gray-700 dark:text-gray-300">Select Surah:</label>
-          </div>
-          <div>
-            <label htmlFor="surah" className="block text-sm font-medium text-gray-700">
-              Surah
-            </label>
-            <QuranSurahDropdown 
-              value={searchSurah}
-              onChange={setSearchSurah}
-              onSurahSelect={handleSurahSelect}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <label htmlFor="ayah" className="block text-sm font-medium text-gray-700">
-              Ayah Number
-            </label>
-            <select
-              id="ayah"
-              value={searchAyah}
-              onChange={(e) => setSearchAyah(e.target.value)}
-              disabled={!searchSurah || maxVerses === 0}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">Select Ayah</option>
-              {verseOptions.map((verse) => (
-                <option key={verse} value={verse}>
-                  {verse}
-                </option>
-              ))}
-            </select>
-            {selectedSurah && (
-              <p className="mt-1 text-xs text-gray-500">
-                {selectedSurah.name} has {selectedSurah.totalVerses} verses
-              </p>
-            )}
-          </div>
-          <div className="md:col-span-3">
-            <div className="flex items-center justify-between">
-              <label htmlFor="quranText" className="block text-sm font-medium text-gray-700">
-                Verse Text
-              </label>
-              {isFetchingVerse && (
-                <span className="text-xs text-gray-500 flex items-center">
-                  <FaSpinner className="mr-1 h-3 w-3 animate-spin" />
-                  Fetching verse...
-                </span>
-              )}
-            </div>
-            <textarea
-              id="quranText"
-              rows={3}
-              value={quranText}
-              onChange={(e) => setQuranText(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
-              placeholder="Enter the Quranic verse text..."
-              dir="rtl"
-              lang="ar"
-            ></textarea>
-            
-            {verseTranslation && (
-              <div className="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
-                <div className="flex items-start">
-                  <FaLightbulb className="mr-2 mt-1 h-3 w-3 text-yellow-500" />
-                  <p>{verseTranslation}</p>
+          <div className="mt-10">
+            <BentoCard name="Generate New Insight" Icon={FaQuran}>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="flex items-center mb-2">
+                  <label className="mr-2 font-medium text-gray-700 dark:text-gray-300">Select Surah:</label>
+                </div>
+                <div>
+                  <label htmlFor="surah" className="block text-sm font-medium text-gray-700">
+                    Surah
+                  </label>
+                  <QuranSurahDropdown 
+                    value={searchSurah}
+                    onChange={setSearchSurah}
+                    onSurahSelect={handleSurahSelect}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ayah" className="block text-sm font-medium text-gray-700">
+                    Ayah Number
+                  </label>
+                  <select
+                    id="ayah"
+                    value={searchAyah}
+                    onChange={(e) => setSearchAyah(e.target.value)}
+                    disabled={!searchSurah || maxVerses === 0}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <option value="">Select Ayah</option>
+                    {verseOptions.map((verse) => (
+                      <option key={verse} value={verse}>
+                        {verse}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedSurah && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {selectedSurah.name} has {selectedSurah.totalVerses} verses
+                    </p>
+                  )}
+                </div>
+                <div className="md:col-span-3">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="quranText" className="block text-sm font-medium text-gray-700">
+                      Verse Text
+                    </label>
+                    {isFetchingVerse && (
+                      <span className="text-xs text-gray-500 flex items-center">
+                        <FaSpinner className="mr-1 h-3 w-3 animate-spin" />
+                        Fetching verse...
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    id="quranText"
+                    rows={3}
+                    value={quranText}
+                    onChange={(e) => setQuranText(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
+                    placeholder="Enter the Quranic verse text..."
+                    dir="rtl"
+                    lang="ar"
+                  ></textarea>
+                  
+                  {verseTranslation && (
+                    <div className="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                      <div className="flex items-start">
+                        <FaLightbulb className="mr-2 mt-1 h-3 w-3 text-yellow-500" />
+                        <p>{verseTranslation}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {error && (
+                <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleGenerateInsight}
+                  disabled={isGenerating || !quranText || !searchSurah || !searchAyah}
+                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
+                    isGenerating || !quranText || !searchSurah || !searchAyah
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
+                  }`}
+                >
+                  {isGenerating ? (
+                    <>
+                      <FaSpinner className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate Insight'
+                  )}
+                </button>
+                <div className="ml-2 inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                  {insightLanguage === 'english' ? 'English' : 
+                   insightLanguage === 'malay' ? 'Bahasa Melayu' :
+                   insightLanguage === 'arabic' ? 'Arabic' :
+                   insightLanguage === 'mandarin' ? 'Mandarin' : 
+                   'English'}
+                </div>
+              </div>
+            </BentoCard>
+          </div>
+
+          <div className="mt-10 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Your Insights</h2>
+
+            {insights.length === 0 ? (
+              <BentoCard
+                name="No insights yet"
+                Icon={FaQuran}
+                description="Generate your first Quranic insight to start your collection"
+              />
+            ) : (
+              <BentoGrid>
+                {insights.map((insight) => (
+                  <BentoCard
+                    key={insight.id}
+                    name={`Surah ${insight.surah}, Ayah ${insight.ayah}`}
+                    description={new Date(insight.created_at).toLocaleDateString()}
+                  >
+                    <div className="absolute top-4 right-4 flex space-x-2 z-20">
+                      <button
+                        onClick={() => handleToggleFavorite(insight.id, insight.is_favorite)}
+                        className="rounded-full p-2 text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                      >
+                        {insight.is_favorite ? (
+                          <FaStar className="h-5 w-5" />
+                        ) : (
+                          <FaRegStar className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="mt-4 max-h-[32rem] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
+                      {insight.image_url && (
+                        <ImageDisplay
+                          imageUrl={insight.image_url}
+                          surah={insight.surah}
+                          ayah={insight.ayah}
+                        />
+                      )}
+                      <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
+                        <p className="text-gray-800 dark:text-gray-200" dir="rtl" lang="ar">{insight.text}</p>
+                      </div>
+                      <div className="mt-4">
+                        <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                          <span>Insight:</span>
+                          <button
+                            onClick={() => handleCopyInsight(insight.id, insight.insight)}
+                            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
+                            aria-label="Copy insight to clipboard"
+                          >
+                            {copiedInsightId === insight.id ? (
+                              <FaCheck className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <FaCopy className="h-4 w-4" />
+                            )}
+                          </button>
+                        </h4>
+                        <p className="mt-2 text-gray-700 dark:text-gray-300">{insight.insight}</p>
+                      </div>
+                    </div>
+                  </BentoCard>
+                ))}
+              </BentoGrid>
             )}
           </div>
         </div>
-
-        {error && (
-          <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end">
-          <div className="flex items-center">
-            <button
-              onClick={handleGenerateInsight}
-              disabled={isGenerating}
-              className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
-            >
-              {isGenerating ? (
-                <>
-                  <FaSpinner className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <FaSearch className="mr-2 h-4 w-4" />
-                  Generate Insight
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </BentoCard>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Your Insights</h2>
-
-        {insights.length === 0 ? (
-          <BentoCard
-            name="No insights yet"
-            Icon={FaQuran}
-            description="Generate your first Quranic insight to start your collection"
-          />
-        ) : (
-          <BentoGrid>
-            {insights.map((insight) => (
-              <BentoCard
-                key={insight.id}
-                name={`Surah ${insight.surah}, Ayah ${insight.ayah}`}
-                description={new Date(insight.created_at).toLocaleDateString()}
-              >
-                <div className="absolute top-4 right-4 flex space-x-2 z-20">
-                  <button
-                    onClick={() => handleToggleFavorite(insight.id, insight.is_favorite)}
-                    className="rounded-full p-2 text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-                  >
-                    {insight.is_favorite ? (
-                      <FaStar className="h-5 w-5" />
-                    ) : (
-                      <FaRegStar className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-                <div className="mt-4 max-h-[32rem] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">
-                  {insight.image_url && (
-                    <ImageDisplay
-                      imageUrl={insight.image_url}
-                      surah={insight.surah}
-                      ayah={insight.ayah}
-                    />
-                  )}
-                  <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950/30">
-                    <p className="text-gray-800 dark:text-gray-200" dir="rtl" lang="ar">{insight.text}</p>
-                  </div>
-                  <div className="mt-4">
-                    <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center justify-between">
-                      <span>Insight:</span>
-                      <button
-                        onClick={() => handleCopyInsight(insight.id, insight.insight)}
-                        className="rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
-                        aria-label="Copy insight to clipboard"
-                      >
-                        {copiedInsightId === insight.id ? (
-                          <FaCheck className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <FaCopy className="h-4 w-4" />
-                        )}
-                      </button>
-                    </h4>
-                    <p className="mt-2 text-gray-700 dark:text-gray-300">{insight.insight}</p>
-                  </div>
-                </div>
-              </BentoCard>
-            ))}
-          </BentoGrid>
-        )}
       </div>
-    </div>
+      <AuthDebugger pageName="quran" />
+    </AuthGuard>
   );
 } 

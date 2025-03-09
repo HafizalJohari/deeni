@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a knowledgeable Islamic scholar and spiritual guide." },
+        { role: "system", content: "You are a knowledgeable Islamic scholar and spiritual guide. Provide 3-5 personalized content recommendations for Islamic learning and spiritual growth. Keep responses respectful, educational, and uplifting. in short and concise manner.(100 words)" },
         { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }

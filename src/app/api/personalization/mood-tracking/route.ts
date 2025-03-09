@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check if mood_entries table exists
+    // Check if mood_entries table exists and create if it doesn't
     const { error: tableCheckError } = await supabase
       .from('mood_entries')
       .select('count')
@@ -76,12 +76,14 @@ export async function POST(request: NextRequest) {
       if (createTableError) {
         console.error('Failed to create table:', createTableError);
         return NextResponse.json({ 
-          error: 'Database setup error' 
+          error: 'Database setup error',
+          details: createTableError.message 
         }, { status: 500 });
       }
     }
 
     // Analyze mood using OpenAI
+    let moodAnalysis: MoodAnalysis;
     try {
       const analysis = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -110,7 +112,6 @@ export async function POST(request: NextRequest) {
         throw new Error('Empty response from OpenAI');
       }
 
-      let moodAnalysis: MoodAnalysis;
       try {
         const parsedContent = JSON.parse(analysis.choices[0].message.content);
         
@@ -136,28 +137,47 @@ export async function POST(request: NextRequest) {
         moodAnalysis = parsedContent as MoodAnalysis;
       } catch (e) {
         console.error('Failed to parse or validate OpenAI response:', e);
-        throw new Error(e instanceof Error ? e.message : 'Invalid response format');
+        throw new Error('Failed to analyze mood: Invalid response format');
       }
 
-      // Insert the mood entry
-      const { data: moodEntry, error: insertError } = await supabase
-        .from('mood_entries')
-        .insert([
-          {
-            user_id: session.user.id,
-            mood_description,
-            analysis: moodAnalysis,
-            created_at: new Date().toISOString()
-          }
-        ])
-        .select()
-        .single();
+      // Insert the mood entry with retry logic
+      let retryCount = 0;
+      const maxRetries = 3;
+      let moodEntry;
+      let insertError;
 
-      if (insertError) {
-        console.error('Insert error:', insertError);
+      while (retryCount < maxRetries) {
+        const result = await supabase
+          .from('mood_entries')
+          .insert([
+            {
+              user_id: session.user.id,
+              mood_description,
+              analysis: moodAnalysis,
+              created_at: new Date().toISOString()
+            }
+          ])
+          .select()
+          .single();
+
+        if (!result.error) {
+          moodEntry = result.data;
+          break;
+        }
+
+        insertError = result.error;
+        retryCount++;
+        
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+        }
+      }
+
+      if (!moodEntry) {
+        console.error('Insert error after retries:', insertError);
         return NextResponse.json({ 
           error: 'Failed to save mood entry',
-          details: insertError.message
+          details: insertError?.message || 'Database error after multiple retries'
         }, { status: 500 });
       }
 

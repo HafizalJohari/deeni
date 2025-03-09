@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BeamsBackground } from '@/components/ui/BeamsBackground';
+import GoogleLoginButton from '@/components/auth/GoogleLoginButton';
+import { AnimatedGridPattern } from '@/components/ui/AnimatedGridPattern';
 
 const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -98,11 +100,19 @@ export default function RegisterPage() {
   }
 
   return (
-    <BeamsBackground intensity="medium">
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="relative min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-zinc-950 dark:to-zinc-900">
+      <AnimatedGridPattern 
+        className="opacity-50 text-green-800/20 dark:text-emerald-500/20"
+        numSquares={70}
+        maxOpacity={0.3}
+        duration={5} 
+      />
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 rounded-xl bg-white/90 backdrop-blur-sm p-8 shadow-lg">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-green-800">Join Deeni</h1>
+            <Link href="/" className="inline-block">
+              <h1 className="text-3xl font-bold text-green-800">DEENI</h1>
+            </Link>
             <p className="mt-2 text-gray-600">Create your account</p>
           </div>
 
@@ -111,6 +121,16 @@ export default function RegisterPage() {
               {error}
             </div>
           )}
+
+          <div className="mt-6">
+            <GoogleLoginButton redirectTo="/dashboard" />
+            
+            <div className="mt-4 flex items-center">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <div className="mx-4 text-sm text-gray-500">or</div>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit(handleRegister)} className="mt-8 space-y-6">
             <div className="space-y-4">
@@ -200,6 +220,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-    </BeamsBackground>
+    </div>
   );
 } 

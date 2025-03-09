@@ -327,8 +327,11 @@ export function FloatingPrayerTime() {
         onClick={() => setIsVisible(true)}
       >
         <div className="flex items-center space-x-2">
-          <Clock className="w-4 h-4" />
-          <span className="text-sm font-medium">Show Prayer Times</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm3 14.59L11.41 13l-1.41-1.41L14.59 7 16 8.41 12.41 12 16 15.59z"/>
+            <path d="M4 12h2m12 0h2M12 4v2m0 12v2"/>
+          </svg>
+          <span className="text-sm font-medium">Prayer Times</span>
         </div>
       </div>
     );

@@ -1,13 +1,153 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BeamsBackground } from '@/components/ui/BeamsBackground';
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import GoogleLoginButton from '@/components/auth/GoogleLoginButton';
+
+interface AnimatedGridPatternProps {
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  strokeDasharray?: any;
+  numSquares?: number;
+  className?: string;
+  maxOpacity?: number;
+  duration?: number;
+  repeatDelay?: number;
+}
+
+function AnimatedGridPattern({
+  width = 40,
+  height = 40,
+  x = -1,
+  y = -1,
+  strokeDasharray = 0,
+  numSquares = 50,
+  className,
+  maxOpacity = 0.5,
+  duration = 4,
+  repeatDelay = 0.5,
+  ...props
+}: AnimatedGridPatternProps) {
+  const id = useId();
+  const containerRef = useRef(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [squares, setSquares] = useState(() => generateSquares(numSquares));
+
+  function getPos() {
+    return [
+      Math.floor((Math.random() * dimensions.width) / width),
+      Math.floor((Math.random() * dimensions.height) / height),
+    ];
+  }
+
+  function generateSquares(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      pos: getPos(),
+    }));
+  }
+
+  const updateSquarePosition = (id: number) => {
+    setSquares((currentSquares) =>
+      currentSquares.map((sq) =>
+        sq.id === id
+          ? {
+              ...sq,
+              pos: getPos(),
+            }
+          : sq,
+      ),
+    );
+  };
+
+  useEffect(() => {
+    if (dimensions.width && dimensions.height) {
+      setSquares(generateSquares(numSquares));
+    }
+  }, [dimensions, numSquares]);
+
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+    };
+  }, [containerRef]);
+
+  return (
+    <svg
+      ref={containerRef}
+      aria-hidden="true"
+      className={cn(
+        "pointer-events-none absolute inset-0 h-full w-full fill-gray-400/30 stroke-gray-400/30",
+        className,
+      )}
+      {...props}
+    >
+      <defs>
+        <pattern
+          id={id}
+          width={width}
+          height={height}
+          patternUnits="userSpaceOnUse"
+          x={x}
+          y={y}
+        >
+          <path
+            d={`M.5 ${height}V.5H${width}`}
+            fill="none"
+            strokeDasharray={strokeDasharray}
+          />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`} />
+      <svg x={x} y={y} className="overflow-visible">
+        {squares.map(({ pos: [x, y], id }, index) => (
+          <motion.rect
+            initial={{ opacity: 0 }}
+            animate={{ opacity: maxOpacity }}
+            transition={{
+              duration,
+              repeat: 1,
+              delay: index * 0.1,
+              repeatType: "reverse",
+            }}
+            onAnimationComplete={() => updateSquarePosition(id)}
+            key={`${x}-${y}-${index}`}
+            width={width - 1}
+            height={height - 1}
+            x={x * width + 1}
+            y={y * height + 1}
+            fill="currentColor"
+            strokeWidth="0"
+          />
+        ))}
+      </svg>
+    </svg>
+  );
+}
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -83,6 +223,9 @@ export default function LoginPage() {
       setError(null);
       setCurrentEmail(data.email);
 
+      // Log attempt
+      console.log(`[Login] Attempting login for ${data.email}`);
+
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
@@ -101,10 +244,26 @@ export default function LoginPage() {
       }
 
       // Successful login
-      router.push('/dashboard');
-      router.refresh();
+      console.log('[Login] Authentication successful, preparing redirection');
+      
+      // Check if there's a return_to parameter for redirection
+      const returnTo = searchParams.get('return_to');
+      const redirectPath = returnTo || '/dashboard';
+      
+      console.log(`[Login] Will redirect user to: ${redirectPath}`);
+      
+      // Forcefully refresh the session in case the middleware is having trouble detecting it
+      await supabase.auth.refreshSession();
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      console.log(`[Login] Session refreshed, authenticated: ${!!sessionData.session}`);
+      
+      // If we're caught in a redirect loop, try a more direct approach
+      // Use a direct window location change instead of router navigation
+      window.location.href = redirectPath;
+      
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('[Login] Error:', error);
       setError(error.message || 'An error occurred during login');
     } finally {
       setIsLoading(false);
@@ -116,11 +275,14 @@ export default function LoginPage() {
   }
 
   return (
-    <BeamsBackground intensity="medium">
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="relative min-h-screen">
+      <AnimatedGridPattern className="absolute inset-0" />
+      <div className="relative flex min-h-screen flex-col items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8 rounded-xl bg-white/90 backdrop-blur-sm p-8 shadow-lg">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-green-800">Welcome to Deeni</h1>
+            <Link href="/" className="inline-block">
+              <h1 className="text-3xl font-bold text-green-800">DEENI</h1>
+            </Link>
             <p className="mt-2 text-gray-600">Sign in to your account</p>
           </div>
 
@@ -150,6 +312,16 @@ export default function LoginPage() {
               )}
             </div>
           )}
+
+          <div className="mt-6">
+            <GoogleLoginButton redirectTo="/dashboard" />
+            
+            <div className="mt-4 flex items-center">
+              <div className="flex-grow border-t border-gray-300"></div>
+              <div className="mx-4 text-sm text-gray-500">or</div>
+              <div className="flex-grow border-t border-gray-300"></div>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit(handleLogin)} className="mt-8 space-y-6">
             <div>
@@ -204,6 +376,6 @@ export default function LoginPage() {
           </form>
         </div>
       </div>
-    </BeamsBackground>
+    </div>
   );
 } 

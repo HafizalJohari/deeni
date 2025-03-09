@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FloatingPrayerTime } from '@/components/ui/FloatingPrayerTime'
+import { AuthProvider } from '@/contexts/AuthContext'
 import './globals.css'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -53,15 +55,18 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head />
-      <body className={`${inter.className} antialiased min-h-screen bg-background font-sans`}>
+      <body className={`${inter.className} antialiased min-h-screen bg-background font-sans`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <FloatingPrayerTime />
+          <AuthProvider>
+            {children}
+            <FloatingPrayerTime />
+            <Toaster richColors position="top-right" />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

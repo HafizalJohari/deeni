@@ -33,7 +33,7 @@ export function PrayerNotification({
     if (!isVisible) return null;
 
     return (
-        <div className="w-full max-w-xl mx-auto fixed bottom-20 right-4 z-50 transition-all duration-300 ease-in-out" style={{ maxWidth: "360px" }}>
+        <div className="fixed top-4 right-4 z-50 transition-all duration-300 ease-in-out" style={{ maxWidth: "360px" }}>
             <div className="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-[0_1px_6px_0_rgba(0,0,0,0.08)] rounded-xl p-4">
                 <div className="flex items-center gap-4">
                     <div className="relative h-10 w-10 flex-shrink-0 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center">

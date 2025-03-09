@@ -1,340 +1,270 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
+import { AnimatedGridPattern } from '@/components/ui/AnimatedGridPattern';
 import Link from 'next/link';
-import { FaPlus, FaCheck, FaRegClock, FaCalendarAlt, FaEllipsisH } from 'react-icons/fa';
-import { habitGuidance, getRandomGuidance } from '@/lib/islamic-guidance';
+import { AuthGuard } from '@/components/auth/AuthGuard';
+import AuthDebugger from '@/components/auth/AuthDebugger';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { PageHeaderCard } from '@/components/ui/PageHeaderCard';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { FaTasks, FaPlus } from 'react-icons/fa';
 
-type Habit = {
+interface HabitLog {
   id: string;
+  habit_id: string;
+  user_id: string;
+  created_at: string;
+  count: number;
+  notes?: string;
+}
+
+interface Habit {
+  id: string;
+  user_id: string;
   title: string;
-  description: string | null;
+  description?: string;
+  created_at: string;
+  updated_at: string;
   category: string;
   frequency: string;
   target_count: number;
   current_count: number;
   is_completed: boolean;
   start_date: string;
-  end_date: string | null;
-};
+  end_date?: string;
+  last_tracked_at?: string;
+}
 
 export default function HabitsPage() {
+  const { user } = useAuthContext();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'completed'>('all');
-  const [error, setError] = useState<string | null>(null);
-
+  const [updatingHabitId, setUpdatingHabitId] = useState<string | null>(null);
+  
   useEffect(() => {
     const fetchHabits = async () => {
+      if (!user) return;
+      
       try {
-        setError(null);
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return;
-
+        setIsLoading(true);
         const { data, error } = await supabase
           .from('habits')
           .select('*')
-          .eq('user_id', userData.user.id)
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
-
-        if (error) throw error;
+          
+        if (error) {
+          console.error('Error fetching habits:', error);
+          return;
+        }
+        
         setHabits(data || []);
-      } catch (error: any) {
-        console.error('Error fetching habits:', error);
-        setError('Failed to load habits. Please try again.');
+      } catch (error) {
+        console.error('Error:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchHabits();
+  }, [user]);
+  
+  useEffect(() => {
+    const checkAuthState = async () => {
+      console.log('[Habits Page] Checking auth state on mount');
+      const { data, error } = await supabase.auth.getSession();
+      console.log('[Habits Page] Session check result:', { 
+        hasSession: !!data.session,
+        user: data.session?.user?.id || 'none',
+        error: error ? error.message : 'none'
+      });
+    };
+    
+    checkAuthState();
   }, []);
-
+  
   const handleLogProgress = async (habitId: string) => {
-    try {
-      // Find the habit
-      const habit = habits.find((h) => h.id === habitId);
-      if (!habit) {
-        throw new Error('Habit not found');
-      }
+    if (!user || updatingHabitId) return;
 
-      // Check if habit is already completed
-      if (habit.is_completed) {
+    try {
+      setUpdatingHabitId(habitId);
+      
+      // Get the current habit
+      const habit = habits.find(h => h.id === habitId);
+      if (!habit) return;
+
+      // Check if target is already reached
+      if (habit.current_count >= habit.target_count) {
+        toast.info("You've already reached your target for this habit!");
         return;
       }
 
-      // Get current user
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) {
-        throw new Error('User not authenticated');
-      }
+      // Start a Supabase transaction
+      const newCount = habit.current_count + 1;
+      const isNowCompleted = newCount >= habit.target_count;
+      const now = new Date().toISOString();
 
-      // Start a transaction by getting the current habit state
-      const { data: currentHabit, error: habitError } = await supabase
-        .from('habits')
-        .select('current_count, target_count')
-        .eq('id', habitId)
-        .single();
-
-      if (habitError) throw habitError;
-      if (!currentHabit) {
-        throw new Error('Could not fetch current habit state');
-      }
-
-      const newCount = (currentHabit.current_count || 0) + 1;
-      const isCompleted = newCount >= currentHabit.target_count;
-
-      // Create a new log entry
-      const { error: logError } = await supabase.from('habit_logs').insert({
-        habit_id: habitId,
-        user_id: userData.user.id,
-        count: 1,
-        created_at: new Date().toISOString(),
-      });
-
-      if (logError) throw logError;
-
-      // Update the habit's progress
-      const { error: updateError } = await supabase
-        .from('habits')
-        .update({
-          current_count: newCount,
-          is_completed: isCompleted,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', habitId);
-
-      if (updateError) throw updateError;
-
-      // Update local state
-      setHabits(
-        habits.map((h) =>
-          h.id === habitId
-            ? {
-                ...h,
-                current_count: newCount,
-                is_completed: isCompleted,
-              }
-            : h
-        )
-      );
-
-      // If habit is completed, update user's points and streak
-      if (isCompleted) {
-        const { error: statsError } = await supabase.rpc('increment_user_stats', {
-          user_id: userData.user.id,
-          points_to_add: 10,
-          streak_to_add: 1,
+      // First, create a log entry
+      const { error: logError } = await supabase
+        .from('habit_logs')
+        .insert({
+          habit_id: habitId,
+          user_id: user.id,
+          count: 1,
+          created_at: now
         });
 
-        if (statsError) throw statsError;
+      if (logError) {
+        throw logError;
       }
-    } catch (error: any) {
-      console.error('Error logging progress:', error.message || error);
-      throw error; // Re-throw the error to be handled by the UI
+
+      // Then update the habit
+      const { data, error: habitError } = await supabase
+        .from('habits')
+        .update({ 
+          current_count: newCount,
+          last_tracked_at: now,
+          is_completed: isNowCompleted,
+          updated_at: now
+        })
+        .eq('id', habitId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (habitError) {
+        throw habitError;
+      }
+
+      // Update local state
+      setHabits(habits.map(h => 
+        h.id === habitId ? { 
+          ...h, 
+          current_count: newCount,
+          last_tracked_at: now,
+          is_completed: isNowCompleted,
+          updated_at: now
+        } : h
+      ));
+
+      // Show success message
+      toast.success('Progress logged successfully!');
+
+      // Check if target reached
+      if (isNowCompleted) {
+        toast.success("Congratulations! You've reached your target! 🎉");
+      }
+
+    } catch (error) {
+      console.error('Error logging progress:', error);
+      toast.error('Failed to log progress. Please try again.');
+    } finally {
+      setUpdatingHabitId(null);
     }
   };
-
-  const handleLogProgressClick = async (habitId: string) => {
-    try {
-      setError(null);
-      await handleLogProgress(habitId);
-      // Optionally show success message
-    } catch (error: any) {
-      setError(error.message || 'Failed to log progress. Please try again.');
-    }
-  };
-
-  const filteredHabits = habits.filter((habit) => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'active') return !habit.is_completed;
-    if (activeFilter === 'completed') return habit.is_completed;
-    return true;
-  });
-
-  const randomHabitGuidance = getRandomGuidance(habitGuidance);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center mb-4">
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Habit Tracker</h1>
-          </div>
-          <p className="mt-1 text-gray-600">Track your good deeds and build consistency</p>
-        </div>
-        <div className="mt-4 sm:mt-0">
-          <div className="flex items-center">
+    <AuthGuard>
+      <div className="container mx-auto py-6 px-4 sm:px-6">
+        <PageHeaderCard
+          title="Habits Tracker"
+          description="Track and manage your daily Islamic habits to build consistency"
+          icon={FaTasks}
+          actions={
             <Link
               href="/dashboard/habits/new"
-              className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              className="inline-flex items-center"
             >
-              <FaPlus className="mr-2 h-4 w-4" />
-              Add New Habit
+              <Button size="sm">
+                <FaPlus className="mr-2 h-3 w-3" />
+                New Habit
+              </Button>
             </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex space-x-2 rounded-lg bg-white p-2 shadow-sm">
-        <button
-          onClick={() => setActiveFilter('all')}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            activeFilter === 'all'
-              ? 'bg-green-100 text-green-800'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setActiveFilter('active')}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            activeFilter === 'active'
-              ? 'bg-green-100 text-green-800'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          Active
-        </button>
-        <button
-          onClick={() => setActiveFilter('completed')}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            activeFilter === 'completed'
-              ? 'bg-green-100 text-green-800'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          Completed
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-
-      {filteredHabits.length === 0 ? (
-        <div className="flex h-60 flex-col items-center justify-center rounded-lg bg-white p-6 text-center shadow-sm">
-          <div className="rounded-full bg-green-100 p-3">
-            <FaCalendarAlt className="h-6 w-6 text-green-600" />
-          </div>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No habits found</h3>
-          <p className="mt-1 text-gray-600">
-            {activeFilter === 'all'
-              ? "You haven't created any habits yet."
-              : activeFilter === 'active'
-              ? "You don't have any active habits."
-              : "You haven't completed any habits yet."}
-          </p>
-          <Link
-            href="/dashboard/habits/new"
-            className="mt-4 inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-          >
-            <FaPlus className="mr-2 h-4 w-4" />
-            Create your first habit
-          </Link>
-        </div>
-      ) : (
-        <div className="h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
-            {filteredHabits.map((habit) => (
-              <div
-                key={habit.id}
-                className="aspect-square flex flex-col rounded-lg bg-white p-6 shadow-sm transition-all hover:shadow-md"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      habit.category === 'prayer'
-                        ? 'bg-blue-100 text-blue-800'
-                        : habit.category === 'charity'
-                        ? 'bg-purple-100 text-purple-800'
-                        : habit.category === 'quran'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {habit.category.charAt(0).toUpperCase() + habit.category.slice(1)}
-                  </span>
-                  <div className="relative">
-                    <button className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                      <FaEllipsisH className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex-grow">
-                  <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{habit.title}</h3>
-                  {habit.description && (
-                    <p className="mt-1 text-sm text-gray-600 line-clamp-2">{habit.description}</p>
-                  )}
-
-                  <div className="mt-4 flex items-center text-sm text-gray-600">
-                    <FaRegClock className="mr-1.5 h-4 w-4 flex-shrink-0" />
-                    <span className="line-clamp-1">{habit.frequency}</span>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Progress</span>
-                      <span className="text-sm font-medium text-gray-700">
-                        {habit.current_count}/{habit.target_count}
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                      <div
-                        className="h-2 rounded-full bg-green-600 transition-all duration-300"
-                        style={{
-                          width: `${Math.min(
-                            (habit.current_count / habit.target_count) * 100,
-                            100
-                          )}%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  {habit.is_completed ? (
-                    <button
-                      disabled
-                      className="flex w-full items-center justify-center rounded-md bg-green-100 px-4 py-2 text-sm font-medium text-green-800"
-                    >
-                      <FaCheck className="mr-2 h-4 w-4" />
-                      Completed
-                    </button>
-                  ) : (
-                    <Button
-                      onClick={() => handleLogProgressClick(habit.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 justify-center"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Log Progress
-                    </Button>
-                  )}
-                </div>
+          }
+        />
+        
+        <div className="space-y-6 p-6 relative">
+          <AnimatedGridPattern 
+            className="dark:fill-green-900/5 dark:stroke-green-900/20 fill-green-600/5 stroke-green-600/20 z-0" 
+            numSquares={40}
+            maxOpacity={0.3}
+          />
+          
+          <div className="relative z-10">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-500 border-r-transparent"></div>
+                <p className="mt-4 text-gray-600">Loading habits...</p>
               </div>
-            ))}
+            ) : habits.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {habits.map((habit) => (
+                  <div 
+                    key={habit.id}
+                    className="flex flex-col justify-between rounded-xl bg-white dark:bg-gray-800 p-6 shadow-md transition-all hover:shadow-lg"
+                  >
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">{habit.title}</h3>
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{habit.description}</p>
+                      
+                      <div className="mt-4">
+                        <div className="flex justify-between text-sm font-medium text-gray-900 dark:text-white">
+                          <span>Progress</span>
+                          <span>{habit.current_count} / {habit.target_count}</span>
+                        </div>
+                        <div className="mt-1 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div 
+                            className="h-2 rounded-full bg-green-600 transition-all duration-300"
+                            style={{ width: `${Math.min((habit.current_count / habit.target_count) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-6 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {habit.last_tracked_at 
+                          ? `Last tracked: ${new Date(habit.last_tracked_at).toLocaleDateString()}`
+                          : `Created: ${new Date(habit.created_at).toLocaleDateString()}`
+                        }
+                      </span>
+                      <button
+                        onClick={() => handleLogProgress(habit.id)}
+                        disabled={updatingHabitId === habit.id || habit.current_count >= habit.target_count}
+                        className={cn(
+                          "rounded-md px-3 py-1 text-sm font-medium transition-all",
+                          updatingHabitId === habit.id
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : habit.current_count >= habit.target_count
+                            ? "bg-green-100 text-green-700 cursor-not-allowed"
+                            : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        )}
+                      >
+                        {updatingHabitId === habit.id 
+                          ? 'Updating...' 
+                          : habit.current_count >= habit.target_count
+                          ? 'Completed!'
+                          : 'Log Progress'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl shadow">
+                <p className="text-gray-600 dark:text-gray-400">You haven't created any habits yet.</p>
+                <p className="mt-2 text-gray-500 dark:text-gray-500">Start tracking your good deeds and build consistency in your practice.</p>
+              </div>
+            )}
           </div>
         </div>
-      )}
-    </div>
+      </div>
+      <AuthDebugger pageName="habits" />
+    </AuthGuard>
   );
 } 

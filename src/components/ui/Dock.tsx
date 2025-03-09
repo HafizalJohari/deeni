@@ -296,19 +296,14 @@ export function AppDock() {
       href: '/dashboard/hadith',
     },
     {
-      icon: <Heart className="h-5 w-5" />,
-      label: 'Personalization',
-      href: '/standalone-personalization',
-    },
-    {
       icon: <User className="h-5 w-5" />,
-      label: 'Profile',
+      label: 'Account',
       href: '/dashboard/profile',
     },
     {
       icon: <Settings className="h-5 w-5" />,
       label: 'Settings',
-      href: '/standalone-personalization?tab=settings',
+      href: '/dashboard/settings',
     },
     {
       icon: <LogOut className="h-5 w-5" />,

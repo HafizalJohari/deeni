@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       ).length;
       
       // Calculate overall relevance score (0-1)
-      const maxPossibleMatches = keywordArray.length * 3; // Across themes, title, and description
+      const maxPossibleMatches = keywordArray.length * 3;
       const actualMatches = themeMatches + titleMatches + descriptionMatches;
       const relevanceScore = Math.min(actualMatches / maxPossibleMatches, 1);
       
@@ -139,13 +139,9 @@ export async function POST(request: Request) {
         matchCount: actualMatches
       };
     })
-    // Only include hadith with some relevance
     .filter(hadith => hadith.relevanceScore > 0)
-    // Sort by relevance score (highest first)
     .sort((a, b) => b.relevanceScore - a.relevanceScore)
-    // Take top 5 most relevant
     .slice(0, 5)
-    // Format for the response
     .map(hadith => ({
       id: hadith.id,
       title: hadith.title,
@@ -157,7 +153,6 @@ export async function POST(request: Request) {
 
     // If no matches found, return a helpful response
     if (matchingHadith.length === 0) {
-      // Generate a general hadith recommendation instead
       const randomHadith = HADITH_COLLECTION[Math.floor(Math.random() * HADITH_COLLECTION.length)];
       
       return NextResponse.json({

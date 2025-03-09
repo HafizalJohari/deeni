@@ -66,7 +66,7 @@ const MoodTracker = () => {
 
   // Submit mood entry
   const handleSubmitMood = async () => {
-    if (!moodDescription.trim()) return;
+    if (!moodDescription.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     
@@ -85,11 +85,12 @@ const MoodTracker = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit mood');
+        const errorMessage = data.error || data.details || 'Failed to submit mood';
+        throw new Error(errorMessage);
       }
       
       if (data.moodEntry) {
-        setMoodEntries([data.moodEntry, ...moodEntries]);
+        setMoodEntries(prevEntries => [data.moodEntry, ...prevEntries]);
         setMoodDescription('');
         setActiveTab('history');
       } else {

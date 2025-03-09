@@ -48,9 +48,11 @@ export default function NotificationSettings() {
       } catch (error) {
         console.error('Error fetching settings:', error);
         toast({
+          id: 'error-toast',
           title: 'Error',
-          description: 'Failed to load notification settings',
-          variant: 'destructive'
+          description: 'Failed to load notification settings', 
+          variant: 'destructive',
+          visible: true
         });
       } finally {
         setIsLoading(false);
@@ -72,8 +74,10 @@ export default function NotificationSettings() {
         if (settings) {
           setPersonalizationSettings(settings);
           toast({
-            title: 'Success',
-            description: 'Notification settings saved successfully'
+            id: 'success-toast',
+            title: 'Success', 
+            description: 'Notification settings saved successfully',
+            visible: true
           });
         }
       } else {
@@ -89,8 +93,10 @@ export default function NotificationSettings() {
         if (settings) {
           setPersonalizationSettings(settings);
           toast({
+            id: 'success-toast', 
             title: 'Success',
-            description: 'Notification settings updated successfully'
+            description: 'Notification settings updated successfully',
+            visible: true
           });
         }
       }
