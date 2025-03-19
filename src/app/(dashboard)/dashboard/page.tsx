@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { generateDailyReminder } from '@/lib/openai/client';
+import { generateDailyReminder } from '@/lib/xai/client';
 import { FaCalendarCheck, FaChartLine, FaMedal, FaQuran, FaBook, FaUserCog, FaSearch, FaStar, FaRegStar, FaSpinner, FaCopy, FaCheck } from 'react-icons/fa';
 import Link from 'next/link';
 import { generalGuidance, habitGuidance, quranGuidance, hadithGuidance, getRandomGuidance } from '@/lib/islamic-guidance';
@@ -15,6 +15,7 @@ import { AnimatedGridPattern } from '@/components/ui/AnimatedGridPattern';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { Book, BookOpenText, Brain, Calendar, HeartHandshake, UserCog } from 'lucide-react';
 
 function AuthDebugger() {
   useEffect(() => {
@@ -252,7 +253,7 @@ export default function DashboardPage() {
             <BentoGrid>
               <BentoCard
                 name="Active Habits"
-                Icon={FaCalendarCheck}
+                Icon={Calendar}
                 description="Track your daily Islamic practices and build consistency"
                 href="/dashboard/habits"
                 cta="View all habits"
@@ -300,7 +301,7 @@ export default function DashboardPage() {
 
               <BentoCard
                 name="Personalization"
-                Icon={FaUserCog}
+                Icon={UserCog}
                 description="Personalize your spiritual journey with AI-powered insights"
                 href="/dashboard/personalization"
                 cta="Get Started"
@@ -321,7 +322,7 @@ export default function DashboardPage() {
 
               <BentoCard
                 name="Quran Insights"
-                Icon={FaQuran}
+                Icon={Book}
                 description="Explore Quranic insights to enrich your journey"
                 href="/dashboard/quran"
                 cta="Explore Quran"
@@ -338,7 +339,7 @@ export default function DashboardPage() {
 
               <BentoCard
                 name="Hadith Insights"
-                Icon={FaBook}
+                Icon={BookOpenText}
                 description="Discover wisdom from Hadith for daily application"
                 href="/dashboard/hadith"
                 cta="Explore Hadith"
@@ -348,6 +349,27 @@ export default function DashboardPage() {
                     <p className="text-gray-600">{hadithTipGuidance.title}</p>
                     <div className="mt-4 text-sm text-gray-500">
                       Daily hadith and lessons
+                    </div>
+                  </div>
+                </div>
+              </BentoCard>
+
+              <BentoCard
+                name="Self Reflection"
+                Icon={HeartHandshake}
+                description="Track your spiritual and emotional journey through daily reflections"
+                href="/dashboard/self-reflections"
+                cta="Start Reflecting"
+              >
+                <div className="mt-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-6 shadow-sm">
+                  <div className="text-center">
+                    <p className="text-gray-600">Record your daily spiritual journey</p>
+                    <div className="mt-4 flex justify-center space-x-2">
+                      {['Mood', 'Goals', 'Growth'].map((topic) => (
+                        <Badge key={topic} variant="secondary" className="text-xs">
+                          {topic}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
                 </div>

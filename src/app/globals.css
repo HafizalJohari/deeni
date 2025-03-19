@@ -96,6 +96,32 @@
   }
 }
 
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+.animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
+
 /* Toast animations */
 @keyframes enter {
   0% {
@@ -250,8 +276,10 @@
   --muted-foreground: 0 0% 40%;
   --accent: 0 0% 90%;
   --accent-foreground: 0 0% 0%;
+  --destructive: 0 100% 30%;
+  --destructive-foreground: 0 0% 100%;
   --border: 0 0% 0%;
-  --input: 0 0% 80%;
+  --input: 0 0% 0%;
   --ring: 0 0% 0%;
 }
 
@@ -262,24 +290,25 @@
   --card-foreground: 0 0% 100%;
   --popover: 0 0% 0%;
   --popover-foreground: 0 0% 100%;
-  --primary: 0 0% 80%;
+  --primary: 0 0% 100%;
   --primary-foreground: 0 0% 0%;
-  --secondary: 0 0% 20%;
+  --secondary: 0 0% 10%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 80%;
-  --accent: 0 0% 20%;
+  --muted: 0 0% 5%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 0 0% 10%;
   --accent-foreground: 0 0% 100%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 0 0% 100%;
   --border: 0 0% 100%;
-  --input: 0 0% 30%;
+  --input: 0 0% 100%;
   --ring: 0 0% 100%;
 }
 
 .high-contrast :is(button, a, input, select, textarea, [role="button"]) {
-  outline: 2px solid transparent;
+  outline: 2px solid currentColor;
 }
 
 .high-contrast :is(button, a, input, select, textarea, [role="button"]):focus {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline-width: 4px;
 }

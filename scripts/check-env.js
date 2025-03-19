@@ -14,9 +14,9 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const requiredEnvVars = [
   {
-    name: 'OPENAI_API_KEY',
+    name: 'XAI_API_KEY',
     description: 'Required for AI features like daily reminders and insights',
-    prefix: 'sk-',
+    prefix: 'xai-',
   },
   {
     name: 'NEXT_PUBLIC_SUPABASE_URL',

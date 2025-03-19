@@ -35,6 +35,7 @@ import {
   Heart,
   LogOut,
   GraduationCap,
+  Hexagon,
 } from 'lucide-react';
 
 const DOCK_HEIGHT = 128;
@@ -287,9 +288,9 @@ export function AppDock() {
       href: '/dashboard/habits',
     },
     {
-      icon: <GraduationCap className="h-5 w-5" />,
-      label: 'Learn',
-      href: '/dashboard/learn',
+      icon: <Hexagon className="h-5 w-5" />,
+      label: 'Self Reflections',
+      href: '/dashboard/self-reflections',
     },
     {
       icon: <BookOpen className="h-5 w-5" />,

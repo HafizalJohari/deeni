@@ -4,24 +4,23 @@ import { getCachedReminder, setCachedReminder } from '@/utils/reminderCache';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 
-// Initialize OpenAI client with better error handling
-const getOpenAIClient = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+// Initialize OpenAI client with X.AI configuration
+const getXAIClient = () => {
+  const apiKey = process.env.XAI_API_KEY;
   
   if (!apiKey) {
-    console.warn('OpenAI API key is not configured');
+    console.warn('XAI API key is not configured');
     return null;
   }
   
   return new OpenAI({
     apiKey,
+    baseURL: "https://api.x.ai/v1",
   });
 };
 
-const openai = getOpenAIClient();
-
-// Set a timeout for OpenAI requests
-const OPENAI_TIMEOUT_MS = 15000; // 15 seconds
+// Set a timeout for XAI requests
+const XAI_TIMEOUT_MS = 15000; // 15 seconds
 
 export async function POST(request: Request) {
   try {
@@ -52,8 +51,11 @@ export async function POST(request: Request) {
       return response;
     }
 
-    // If OpenAI client is not available, return a default response
-    if (!openai) {
+    // Initialize XAI client for this request
+    const xai = getXAIClient();
+
+    // If XAI client is not available, return a default response
+    if (!xai) {
       const defaultReminder = `May Allah bless you with peace and success today, ${username}. Remember to approach each task with mindfulness and gratitude.`;
       setCachedReminder(sessionId, defaultReminder);
       const response = NextResponse.json({ reminder: defaultReminder });
@@ -66,23 +68,23 @@ export async function POST(request: Request) {
       return response;
     }
 
-    // Create a timeout for the OpenAI request
+    // Create a timeout for the XAI request
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`OpenAI request timed out after ${OPENAI_TIMEOUT_MS}ms`));
-      }, OPENAI_TIMEOUT_MS);
+        reject(new Error(`XAI request timed out after ${XAI_TIMEOUT_MS}ms`));
+      }, XAI_TIMEOUT_MS);
     });
 
     // Create the actual request promise
-    const requestPromise = openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+    const requestPromise = xai.chat.completions.create({
+      model: "grok-2",
       messages: [
         {
-          role: 'system',
-          content: 'You are an AI assistant specialized in Islamic knowledge. Provide a short, motivational daily reminder for Muslims that encourages good deeds and spiritual growth. Keep responses respectful, educational, and uplifting. in short and concise manner.(100 words)'
+          role: "system",
+          content: "You are an AI assistant specialized in Islamic knowledge. Provide a short, motivational daily reminder for Muslims that encourages good deeds and spiritual growth. Keep responses respectful, educational, and uplifting. Keep it concise (100 words max)."
         },
         {
-          role: 'user',
+          role: "user",
           content: `Please provide a short, motivational daily reminder for ${username}. Include a relevant Quranic verse or Hadith if appropriate.`
         }
       ],
@@ -107,11 +109,11 @@ export async function POST(request: Request) {
       sameSite: 'strict'
     });
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating daily reminder:', error);
     
     // Provide a more graceful response for timeouts
-    if (error.message && error.message.includes('timed out')) {
+    if (error instanceof Error && error.message.includes('timed out')) {
       const defaultReminder = `May Allah bless you with peace and success today. Remember to be patient and steadfast in all your endeavors.`;
       return NextResponse.json(
         { 
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
     }
     
     return NextResponse.json(
-      { error: error.message || 'Failed to generate reminder' },
+      { error: error instanceof Error ? error.message : 'Failed to generate reminder' },
       { status: 500 }
     );
   }

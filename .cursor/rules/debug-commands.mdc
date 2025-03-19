@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When i say /debug , gather console logs, and take the screenshot of the app to help fix issues

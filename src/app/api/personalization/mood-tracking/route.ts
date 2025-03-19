@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -20,46 +20,75 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string) {
-            cookieStore.set(name, value);
-          },
-          remove(name: string) {
-            cookieStore.delete(name);
-          },
-        },
-      }
-    );
-
-    const { data: { session } } = await supabase.auth.getSession();
+    console.log('[API] Starting POST request handling');
     
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    console.log('[API] Auth header present:', !!authHeader);
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.log('[API] Invalid or missing authorization header');
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Invalid authorization header'
+      }, { status: 401 });
+    }
+
+    // Create Supabase client
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // Get session using the route handler client
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('[API] Session check:', {
+      hasSession: !!session,
+      hasError: !!sessionError,
+      userEmail: session?.user?.email || 'No email',
+      tokenPresent: !!session?.access_token
+    });
+
+    if (sessionError || !session?.access_token) {
+      console.error('[API] Session error:', sessionError);
+      return NextResponse.json({ 
+        error: 'Authentication error',
+        details: sessionError?.message || 'Invalid session'
+      }, { status: 401 });
+    }
+
+    // Verify that the token matches
+    const token = authHeader.split(' ')[1];
+    if (token !== session.access_token) {
+      console.log('[API] Token mismatch');
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Invalid authentication token'
+      }, { status: 401 });
     }
 
     // Parse and validate request body
     let body;
     try {
       body = await request.json();
+      console.log('[API] Request body:', {
+        hasMoodDescription: !!body?.mood_description,
+        hasDate: !!body?.date
+      });
     } catch (e) {
-      console.error('Failed to parse request body:', e);
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      console.error('[API] Failed to parse request body:', e);
+      return NextResponse.json({ 
+        error: 'Invalid request body',
+        details: 'Could not parse JSON body'
+      }, { status: 400 });
     }
 
     const { mood_description } = body;
 
     if (!mood_description || typeof mood_description !== 'string') {
+      console.log('[API] Invalid mood description:', { received: mood_description });
       return NextResponse.json({ 
-        error: 'Mood description is required and must be a string' 
+        error: 'Mood description is required and must be a string',
+        details: 'Invalid or missing mood_description field'
       }, { status: 400 });
     }
 
@@ -70,11 +99,11 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (tableCheckError) {
-      console.error('Table check error:', tableCheckError);
+      console.error('[API] Table check error:', tableCheckError);
       // Create the table if it doesn't exist
       const { error: createTableError } = await supabase.rpc('create_mood_entries_table');
       if (createTableError) {
-        console.error('Failed to create table:', createTableError);
+        console.error('[API] Failed to create table:', createTableError);
         return NextResponse.json({ 
           error: 'Database setup error',
           details: createTableError.message 
@@ -86,7 +115,7 @@ export async function POST(request: NextRequest) {
     let moodAnalysis: MoodAnalysis;
     try {
       const analysis = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -191,7 +220,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[API] Unhandled error:', error);
     return NextResponse.json({ 
       error: 'Internal Server Error',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -201,30 +230,39 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string) {
-            cookieStore.set(name, value);
-          },
-          remove(name: string) {
-            cookieStore.delete(name);
-          },
-        },
-      }
-    );
-
-    const { data: { session } } = await supabase.auth.getSession();
+    console.log('[API] Starting GET request handling');
     
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    console.log('[API] Auth header present:', !!authHeader);
+
+    // Create Supabase client
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    // Get session using the route handler client
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('[API] Session check:', {
+      hasSession: !!session,
+      hasError: !!sessionError,
+      userEmail: session?.user?.email || 'No email'
+    });
+
+    if (sessionError) {
+      console.error('[API] Session error:', sessionError);
+      return NextResponse.json({ 
+        error: 'Authentication error',
+        details: sessionError.message
+      }, { status: 401 });
+    }
+
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('[API] No session found');
+      return NextResponse.json({ 
+        error: 'Unauthorized - Please log in',
+        details: 'No valid session found'
+      }, { status: 401 });
     }
 
     const { data: moodEntries, error } = await supabase
@@ -235,7 +273,7 @@ export async function GET(request: NextRequest) {
       .limit(10);
 
     if (error) {
-      console.error('Query error:', error);
+      console.error('[API] Query error:', error);
       return NextResponse.json({ 
         error: 'Failed to fetch mood entries',
         details: error.message
@@ -244,7 +282,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ moodEntries });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[API] Unhandled error:', error);
     return NextResponse.json({ 
       error: 'Internal Server Error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 interface AuthGuardProps {
@@ -11,16 +11,24 @@ interface AuthGuardProps {
 export const AuthGuard = ({ children }: AuthGuardProps) => {
   const { user, isLoading, isAuthenticated } = useAuthContext();
   const router = useRouter();
+  const pathname = usePathname();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Add client-side redirect for unauthenticated users
+  // Single source of truth for auth redirects
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.log('[AuthGuard] User not authenticated, redirecting to login');
-      router.push('/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
+    if (isRedirecting) return; // Prevent multiple redirects
 
-  // Just render a loading state while checking auth
+    if (!isLoading && !isAuthenticated) {
+      setIsRedirecting(true);
+      console.log('[AuthGuard] User not authenticated, redirecting to login');
+      
+      // Store the current path for redirect after login
+      const loginUrl = `/login?redirect=${encodeURIComponent(pathname)}`;
+      router.push(loginUrl);
+    }
+  }, [isLoading, isAuthenticated, router, isRedirecting, pathname]);
+
+  // Show loading state while checking auth
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -29,7 +37,7 @@ export const AuthGuard = ({ children }: AuthGuardProps) => {
     );
   }
 
-  // Only render children if authenticated
+  // Show redirect state if not authenticated
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">

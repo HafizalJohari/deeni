@@ -1,13 +1,42 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    flowType: 'pkce',
+    debug: true,
+    storage: {
+      getItem: async (key: string) => {
+        // Try localStorage first
+        const localValue = localStorage.getItem(key);
+        if (localValue) return localValue;
+        
+        // Then try cookies
+        const cookies = document.cookie.split(';');
+        const cookie = cookies.find(c => c.trim().startsWith(`${key}=`));
+        return cookie ? cookie.split('=')[1] : null;
+      },
+      setItem: async (key: string, value: string) => {
+        // Set in localStorage
+        localStorage.setItem(key, value);
+        
+        // Also set in cookies with secure attributes
+        const secure = window.location.protocol === 'https:';
+        document.cookie = `${key}=${value}; path=/; max-age=${60 * 60 * 24 * 7}; ${secure ? 'secure; ' : ''}samesite=lax`;
+      },
+      removeItem: async (key: string) => {
+        // Remove from localStorage
+        localStorage.removeItem(key);
+        
+        // Remove from cookies
+        document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;`;
+      }
+    }
   }
 });
 
@@ -98,7 +127,9 @@ export const debugSupabaseAuth = {
         session: data.session,
         error,
         message: data.session 
-          ? `Active session found, expires: ${new Date(data.session.expires_at * 1000).toISOString()}`
+          ? `Active session found, expires: ${data.session.expires_at 
+              ? new Date(data.session.expires_at * 1000).toISOString()
+              : 'No expiry'}`
           : error 
             ? `Error: ${error.message}` 
             : 'No active session'

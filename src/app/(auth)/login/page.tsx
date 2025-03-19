@@ -226,6 +226,10 @@ export default function LoginPage() {
       // Log attempt
       console.log(`[Login] Attempting login for ${data.email}`);
 
+      // First, ensure no existing session
+      await supabase.auth.signOut();
+
+      // Attempt login
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
@@ -246,21 +250,33 @@ export default function LoginPage() {
       // Successful login
       console.log('[Login] Authentication successful, preparing redirection');
       
-      // Check if there's a return_to parameter for redirection
-      const returnTo = searchParams.get('return_to');
-      const redirectPath = returnTo || '/dashboard';
+      // Get the return_to or redirect parameter, fallback to dashboard
+      const returnTo = searchParams.get('redirect') || searchParams.get('return_to') || '/dashboard';
+      console.log(`[Login] Will redirect user to: ${returnTo}`);
       
-      console.log(`[Login] Will redirect user to: ${redirectPath}`);
+      // Ensure we have a fresh session
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       
-      // Forcefully refresh the session in case the middleware is having trouble detecting it
-      await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error('[Login] Session refresh error:', refreshError);
+        throw refreshError;
+      }
+      
+      if (!refreshData.session) {
+        throw new Error('Session not established after refresh');
+      }
+      
+      // Double check session is established
       const { data: sessionData } = await supabase.auth.getSession();
       
-      console.log(`[Login] Session refreshed, authenticated: ${!!sessionData.session}`);
+      if (!sessionData.session) {
+        throw new Error('Session verification failed');
+      }
       
-      // If we're caught in a redirect loop, try a more direct approach
-      // Use a direct window location change instead of router navigation
-      window.location.href = redirectPath;
+      console.log(`[Login] Session established and verified, redirecting to ${returnTo}`);
+      
+      // Use window.location for a full page reload to ensure clean state
+      window.location.href = returnTo;
       
     } catch (error: any) {
       console.error('[Login] Error:', error);
