@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
 
-const openai = new OpenAI({
+// Initialize xAI client
+const client = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
+  baseURL: "https://api.x.ai/v1",
 });
 
 export async function POST(request: NextRequest) {
@@ -85,26 +87,42 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Analyze reflection using OpenAI
+    // Analyze reflection using xAI
     const prompt = `As an Islamic counselor, analyze this self-reflection from a Muslim perspective:
     Feeling: ${feeling}
     Reflection: ${reflection_text}
 
-    Provide a structured analysis including:
-    1. Islamic perspective on the situation
-    2. Practical recommendations based on Islamic teachings
-    3. Spiritual guidance and reminders
-    4. Relevant Quranic verses (if any)
-    5. Relevant Hadith (if any)
+    Please provide a detailed Islamic analysis in the following format:
 
-    Format the response as a JSON object with these fields.`;
+    {
+      "islamicPerspective": "Provide a thoughtful analysis from an Islamic viewpoint, explaining how this reflection relates to Islamic teachings and principles. Include relevant concepts from the Quran and Sunnah.",
+      
+      "recommendations": "Provide specific, actionable recommendations based on Islamic teachings. Include daily practices, behavioral changes, and spiritual exercises that would be beneficial.",
+      
+      "spiritualGuidance": "Offer spiritual guidance and wisdom, including specific dhikr, duas, and mindfulness practices that would help in this situation. Provide encouragement and support from an Islamic perspective.",
+      
+      "relevantVerses": [
+        "Include 2-3 relevant Quranic concepts or teachings (without specific verse numbers, focus on the meaning and relevance)"
+      ],
 
-    const completion = await openai.chat.completions.create({
+      "relevantHadith": [
+        "Include 2-3 relevant Hadith that provide guidance for this situation (focus on the meaning and lesson rather than full citations)"
+      ]
+    }
+
+    Ensure the response is:
+    1. Compassionate and empathetic
+    2. Practical and actionable
+    3. Rooted in authentic Islamic teachings
+    4. Relevant to modern context
+    5. Easy to understand and implement`;
+
+    const completion = await client.chat.completions.create({
       model: "grok-2-1212",
       messages: [
         {
           role: "system",
-          content: "You are an expert Islamic counselor who provides guidance based on Quran and Sunnah. Your responses should be compassionate, wise, and firmly grounded in Islamic teachings."
+          content: "You are an expert Islamic counselor specializing in spiritual guidance and emotional well-being. Provide guidance that is: 1) Grounded in authentic Islamic teachings from Quran and Sunnah, 2) Compassionate and empathetic, 3) Practical and actionable for modern life, 4) Clear and easy to understand. Focus on the wisdom and relevance of Islamic teachings rather than detailed citations."
         },
         {
           role: "user",
@@ -114,7 +132,11 @@ export async function POST(request: NextRequest) {
       response_format: { type: "json_object" }
     });
 
-    const analysis = JSON.parse(completion.choices[0].message.content);
+    const analysis = completion.choices[0].message.content;
+
+    if (!analysis) {
+      throw new Error('No analysis returned from xAI');
+    }
 
     // Store in database
     const { data: reflection, error: insertError } = await supabase

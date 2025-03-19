@@ -60,21 +60,25 @@ export default function ReflectionAnalysis({ reflections }: ReflectionAnalysisPr
                 <AccordionItem value="islamic-perspective">
                   <AccordionTrigger>Islamic Perspective</AccordionTrigger>
                   <AccordionContent>
-                    <p className="text-muted-foreground">{analysis.islamicPerspective}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{analysis.islamicPerspective}</p>
                   </AccordionContent>
                 </AccordionItem>
 
                 <AccordionItem value="recommendations">
                   <AccordionTrigger>Recommendations</AccordionTrigger>
                   <AccordionContent>
-                    <p className="text-muted-foreground">{analysis.recommendations}</p>
+                    <ul className="list-disc pl-4 space-y-2">
+                      {analysis.recommendations.map((recommendation, index) => (
+                        <li key={index} className="text-muted-foreground">{recommendation}</li>
+                      ))}
+                    </ul>
                   </AccordionContent>
                 </AccordionItem>
 
                 <AccordionItem value="spiritual-guidance">
                   <AccordionTrigger>Spiritual Guidance</AccordionTrigger>
                   <AccordionContent>
-                    <p className="text-muted-foreground">{analysis.spiritualGuidance}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{analysis.spiritualGuidance}</p>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -82,10 +86,11 @@ export default function ReflectionAnalysis({ reflections }: ReflectionAnalysisPr
                   <AccordionItem value="relevant-verses">
                     <AccordionTrigger>Relevant Quranic Verses</AccordionTrigger>
                     <AccordionContent>
-                      <ul className="list-disc pl-4 space-y-2">
+                      <ul className="list-disc pl-4 space-y-4">
                         {analysis.relevantVerses.map((verse, index) => (
                           <li key={index} className="text-muted-foreground">
-                            {verse}
+                            <p className="font-medium">Surah {verse.surah}, Ayah {verse.ayah}</p>
+                            <p className="mt-1 italic">{verse.text}</p>
                           </li>
                         ))}
                       </ul>
@@ -97,10 +102,11 @@ export default function ReflectionAnalysis({ reflections }: ReflectionAnalysisPr
                   <AccordionItem value="relevant-hadith">
                     <AccordionTrigger>Relevant Hadith</AccordionTrigger>
                     <AccordionContent>
-                      <ul className="list-disc pl-4 space-y-2">
+                      <ul className="list-disc pl-4 space-y-4">
                         {analysis.relevantHadith.map((hadith, index) => (
                           <li key={index} className="text-muted-foreground">
-                            {hadith}
+                            <p className="font-medium">{hadith.collection} #{hadith.number}</p>
+                            <p className="mt-1 italic">{hadith.text}</p>
                           </li>
                         ))}
                       </ul>

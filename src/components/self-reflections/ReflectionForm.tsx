@@ -163,6 +163,26 @@ export default function ReflectionForm() {
         throw new Error('Invalid feeling selected');
       }
 
+      // First, analyze the reflection
+      const analysisResponse = await fetch('/api/analyze-reflection', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: reflectionText,
+          feeling: selectedFeeling
+        }),
+      });
+
+      if (!analysisResponse.ok) {
+        const error = await analysisResponse.json();
+        throw new Error(error.details || 'Failed to analyze reflection');
+      }
+
+      const { analysis } = await analysisResponse.json();
+
+      // Then save the reflection with the analysis
       const { error } = await supabase.from('self_reflections').insert([
         {
           user_id: user.id,
@@ -170,13 +190,7 @@ export default function ReflectionForm() {
           feeling: selectedFeeling,
           feeling_icon: feelingOption.icon,
           created_at: new Date().toISOString(),
-          analysis: {
-            islamicPerspective: '',
-            recommendations: [],
-            spiritualGuidance: '',
-            relevantVerses: [],
-            relevantHadith: []
-          }
+          analysis
         },
       ]);
 
@@ -185,7 +199,7 @@ export default function ReflectionForm() {
         throw error;
       }
 
-      toast.success('Reflection submitted successfully');
+      toast.success('Reflection submitted and analyzed successfully');
       setReflectionText('');
       setSelectedFeeling(null);
       router.refresh();
@@ -251,7 +265,9 @@ export default function ReflectionForm() {
         >
           {isSubmitting ? (
             <>
-              <span className="mr-2">Submitting...</span>
+              <span className="mr-2">
+                {isAnalyzing ? 'Analyzing...' : 'Submitting...'}
+              </span>
               <span className="inline-block animate-spin">⏳</span>
             </>
           ) : (

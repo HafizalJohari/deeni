@@ -82,33 +82,21 @@ export async function POST(request: NextRequest) {
         text,
         context: {
           type: 'feeling-analysis',
-          options: Object.values(feelingCategories).flat(),
           perspective: 'islamic'
         }
       });
 
-      const suggestedFeeling = response.feeling?.toLowerCase().trim();
-      console.log('Suggested feeling:', suggestedFeeling);
-
-      if (!suggestedFeeling || !Object.values(feelingCategories).flat().includes(suggestedFeeling)) {
-        console.error('Invalid feeling suggestion:', suggestedFeeling);
-        return NextResponse.json({ 
-          error: 'Invalid feeling suggestion',
-          details: 'The analysis did not return a valid feeling'
-        }, { status: 500 });
+      if (!response.feeling) {
+        throw new Error('No feeling analysis returned from service');
       }
 
-      // Find the category of the feeling
-      const category = Object.entries(feelingCategories).find(([_, feelings]) =>
-        feelings.includes(suggestedFeeling)
-      )?.[0] as 'positive' | 'negative' | 'neutral' | 'spiritual';
-
+      // Convert the feeling to a FeelingOption
       const feelingOption: FeelingOption = {
-        id: suggestedFeeling,
-        label: suggestedFeeling,
-        description: feelingDescriptions[suggestedFeeling as keyof typeof feelingDescriptions],
-        icon: feelingIcons[suggestedFeeling as keyof typeof feelingIcons],
-        category
+        id: response.feeling.label,
+        label: response.feeling.label,
+        icon: '😊', // Default icon, should be mapped based on feeling
+        description: `Feeling ${response.feeling.label} with ${Math.round(response.feeling.confidence * 100)}% confidence`,
+        category: 'neutral' // Default category, should be mapped based on feeling
       };
 
       return NextResponse.json({ suggestedFeeling: feelingOption });

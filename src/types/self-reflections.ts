@@ -1,3 +1,5 @@
+export type AnalysisType = 'feeling-analysis' | 'reflection-analysis';
+
 export interface SelfReflection {
   id: string;
   user_id: string;
