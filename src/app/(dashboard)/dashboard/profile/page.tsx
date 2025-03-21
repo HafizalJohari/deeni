@@ -112,18 +112,29 @@ export default function ProfilePage() {
       let avatar_url = userProfile?.avatar_url;
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop();
-        const filePath = `avatars/${user.id}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        // Upload the file
+        const { data, error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, avatarFile);
+          .upload(filePath, avatarFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
           
         if (uploadError) {
-          toast.error('Failed to upload avatar');
+          console.error('Upload error:', uploadError);
+          toast.error('Failed to upload avatar: ' + uploadError.message);
           return;
         }
         
-        avatar_url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${filePath}`;
+        // Get the public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+          
+        avatar_url = publicUrl;
       }
       
       const updates = {
@@ -132,19 +143,22 @@ export default function ProfilePage() {
         updated_at: new Date().toISOString(),
       };
       
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('users')
         .update(updates)
         .eq('id', user.id);
         
-      if (error) throw error;
+      if (updateError) {
+        console.error('Profile update error:', updateError);
+        throw updateError;
+      }
       
       setUserProfile(prev => ({ ...prev, ...updates }));
       setIsEditing(false);
       toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      toast.error('Failed to update profile: ' + (error as Error).message);
     } finally {
       setIsUpdating(false);
     }
