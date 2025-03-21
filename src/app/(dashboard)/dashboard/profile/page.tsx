@@ -1,310 +1,396 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
-import { FaUser, FaMedal, FaChartLine, FaCalendarCheck, FaStar, FaQuran, FaBook } from 'react-icons/fa';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { AnimatedGridPattern } from '@/components/ui/AnimatedGridPattern';
+import { AuthGuard } from '@/components/auth/AuthGuard';
+import AuthDebugger from '@/components/auth/AuthDebugger';
+import { PageHeaderCard } from '@/components/ui/PageHeaderCard';
+import { FaUser, FaCamera } from 'react-icons/fa';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-const profileSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  email: z.string().email('Please enter a valid email address'),
-});
-
-type ProfileFormValues = z.infer<typeof profileSchema>;
+interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  created_at: string;
+  full_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  level: number;
+  points: number;
+  streak_count: number;
+  twitter_handle?: string;
+  github_handle?: string;
+}
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [stats, setStats] = useState({
-    totalHabits: 0,
-    completedHabits: 0,
-    quranInsights: 0,
-    hadithInsights: 0,
-    favoriteInsights: 0,
-  });
+  const { user } = useAuthContext();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      username: '',
-      email: '',
-    },
-  });
-
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
       try {
-        // Get current user
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return;
-        setUser(userData.user);
-
-        // Get user profile
-        const { data: profileData, error: profileError } = await supabase
+        setIsLoading(true);
+        const { data, error } = await supabase
           .from('users')
           .select('*')
-          .eq('id', userData.user.id)
+          .eq('id', user.id)
           .single();
-
-        if (profileError) throw profileError;
-        setUserProfile(profileData);
-
-        // Set form values
-        reset({
-          username: profileData.username || '',
-          email: userData.user.email || '',
-        });
-
-        // Get user stats
-        const [
-          { count: totalHabits },
-          { count: completedHabits },
-          { count: quranInsights },
-          { count: hadithInsights },
-          { count: favoriteQuranInsights },
-          { count: favoriteHadithInsights },
-        ] = await Promise.all([
-          supabase.from('habits').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id),
-          supabase.from('habits').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id).eq('is_completed', true),
-          supabase.from('quran_insights').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id),
-          supabase.from('hadith_insights').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id),
-          supabase.from('quran_insights').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id).eq('is_favorite', true),
-          supabase.from('hadith_insights').select('*', { count: 'exact', head: true }).eq('user_id', userData.user.id).eq('is_favorite', true),
-        ]);
-
-        setStats({
-          totalHabits: totalHabits || 0,
-          completedHabits: completedHabits || 0,
-          quranInsights: quranInsights || 0,
-          hadithInsights: hadithInsights || 0,
-          favoriteInsights: (favoriteQuranInsights || 0) + (favoriteHadithInsights || 0),
-        });
+          
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          toast.error('Failed to load profile');
+          return;
+        }
+        
+        setUserProfile(data);
+        setEditForm(data);
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error:', error);
+        toast.error('An unexpected error occurred');
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchUserData();
-  }, [reset]);
-
-  const handleUpdateProfile = async (data: ProfileFormValues) => {
-    try {
-      setIsSaving(true);
-      setError(null);
-      setSuccessMessage(null);
-
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Update user profile
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          username: data.username,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-
-      // Update user email if changed
-      if (data.email !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: data.email,
-        });
-
-        if (emailError) throw emailError;
-      }
-
-      // Update local state
-      setUserProfile({
-        ...userProfile,
-        username: data.username,
+    
+    fetchUserProfile();
+  }, [user]);
+  
+  useEffect(() => {
+    const checkAuthState = async () => {
+      console.log('[Profile Page] Checking auth state on mount');
+      const { data, error } = await supabase.auth.getSession();
+      console.log('[Profile Page] Session check result:', { 
+        hasSession: !!data.session,
+        user: data.session?.user?.id || 'none',
+        error: error ? error.message : 'none'
       });
+    };
+    
+    checkAuthState();
+  }, []);
+  
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+    
+    setAvatarFile(file);
+  };
 
-      setSuccessMessage('Profile updated successfully');
-    } catch (error: any) {
-      setError(error.message || 'An error occurred while updating profile');
+  const handleUpdateProfile = async () => {
+    if (!user || !editForm) return;
+    
+    try {
+      setIsUpdating(true);
+      
+      // Upload avatar if changed
+      let avatar_url = userProfile?.avatar_url;
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `avatars/${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, avatarFile);
+          
+        if (uploadError) {
+          toast.error('Failed to upload avatar');
+          return;
+        }
+        
+        avatar_url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${filePath}`;
+      }
+      
+      const updates = {
+        ...editForm,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      };
+      
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      setUserProfile(prev => ({ ...prev, ...updates }));
+      setIsEditing(false);
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
     } finally {
-      setIsSaving(false);
+      setIsUpdating(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
-      </div>
-    );
-  }
-
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+  
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Your Profile</h1>
-        <p className="mt-1 text-gray-600">Manage your account and view your progress</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <div className="flex items-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <FaUser className="h-8 w-8 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <h2 className="text-xl font-semibold text-gray-900">{userProfile?.username || 'User'}</h2>
-              <p className="text-gray-600">{user?.email}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-gray-50 p-4 text-center">
-              <div className="flex justify-center">
-                <FaMedal className="h-6 w-6 text-green-600" />
+    <AuthGuard>
+      <div className="container mx-auto py-6 px-4 sm:px-6">
+        <PageHeaderCard
+          title="Profile"
+          description="Manage your account information"
+          icon={FaUser}
+        />
+        
+        <div className="space-y-6 p-6 relative">
+          <AnimatedGridPattern 
+            className="dark:fill-green-900/5 dark:stroke-green-900/20 fill-green-600/5 stroke-green-600/20 z-0" 
+            numSquares={40}
+            maxOpacity={0.3}
+          />
+          
+          <div className="relative z-10">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-500 border-r-transparent"></div>
+                <p className="mt-4 text-gray-600">Loading profile...</p>
               </div>
-              <p className="mt-2 text-sm font-medium text-gray-600">Level</p>
-              <p className="text-xl font-bold text-gray-900">{userProfile?.level || 1}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4 text-center">
-              <div className="flex justify-center">
-                <FaChartLine className="h-6 w-6 text-green-600" />
-              </div>
-              <p className="mt-2 text-sm font-medium text-gray-600">Points</p>
-              <p className="text-xl font-bold text-gray-900">{userProfile?.points || 0}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4 text-center">
-              <div className="flex justify-center">
-                <FaCalendarCheck className="h-6 w-6 text-green-600" />
-              </div>
-              <p className="mt-2 text-sm font-medium text-gray-600">Streak</p>
-              <p className="text-xl font-bold text-gray-900">{userProfile?.streak_count || 0}</p>
-            </div>
-          </div>
-        </div>
+            ) : userProfile ? (
+              <div className="rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-6 shadow-lg">
+                <div className="space-y-6">
+                  <div className="flex items-center space-x-6">
+                    <div className="relative">
+                      <div className="h-24 w-24 rounded-full overflow-hidden bg-gray-100">
+                        {userProfile.avatar_url ? (
+                          <img
+                            src={userProfile.avatar_url}
+                            alt="Profile"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-green-50 dark:bg-green-900/20">
+                            <FaUser className="h-12 w-12 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {userProfile.full_name || userProfile.username}
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{userProfile.email}</p>
+                    </div>
+                  </div>
 
-        <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Your Stats</h2>
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                  <FaCalendarCheck className="h-5 w-5 text-blue-600" />
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">About</h3>
+                      <p className="mt-2 text-gray-600 dark:text-gray-300">
+                        {userProfile.bio || 'No bio added yet'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Username</p>
+                        <p className="mt-1 text-gray-900 dark:text-white">{userProfile.username}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Member Since</p>
+                        <p className="mt-1 text-gray-900 dark:text-white">
+                          {new Date(userProfile.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {userProfile.twitter_handle && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Twitter</p>
+                          <a
+                            href={`https://twitter.com/${userProfile.twitter_handle}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 text-blue-600 hover:underline"
+                          >
+                            @{userProfile.twitter_handle}
+                          </a>
+                        </div>
+                      )}
+                      {userProfile.github_handle && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">GitHub</p>
+                          <a
+                            href={`https://github.com/${userProfile.github_handle}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 text-blue-600 hover:underline"
+                          >
+                            @{userProfile.github_handle}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Progress</h2>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Level</p>
+                        <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{userProfile.level || 1}</p>
+                      </div>
+                      <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Points</p>
+                        <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{userProfile.points || 0}</p>
+                      </div>
+                      <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Streak</p>
+                        <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{userProfile.streak_count || 0} days</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" className="bg-green-600 hover:bg-green-700">
+                          Edit Profile
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Edit Profile</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="avatar">Profile Picture</Label>
+                            <div className="flex items-center space-x-4">
+                              <div className="h-16 w-16 rounded-full overflow-hidden bg-gray-100">
+                                {avatarFile ? (
+                                  <img
+                                    src={URL.createObjectURL(avatarFile)}
+                                    alt="Preview"
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : userProfile.avatar_url ? (
+                                  <img
+                                    src={userProfile.avatar_url}
+                                    alt="Current"
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center bg-green-50">
+                                    <FaUser className="h-8 w-8 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="cursor-pointer">
+                                  <div className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700">
+                                    <FaCamera className="h-4 w-4" />
+                                    <span>Change</span>
+                                  </div>
+                                  <input
+                                    type="file"
+                                    id="avatar"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleAvatarChange}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="full_name">Full Name</Label>
+                            <Input
+                              id="full_name"
+                              name="full_name"
+                              value={editForm.full_name || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="bio">Bio</Label>
+                            <Textarea
+                              id="bio"
+                              name="bio"
+                              value={editForm.bio || ''}
+                              onChange={handleInputChange}
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="twitter_handle">Twitter Handle</Label>
+                            <Input
+                              id="twitter_handle"
+                              name="twitter_handle"
+                              value={editForm.twitter_handle || ''}
+                              onChange={handleInputChange}
+                              placeholder="username (without @)"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="github_handle">GitHub Handle</Label>
+                            <Input
+                              id="github_handle"
+                              name="github_handle"
+                              value={editForm.github_handle || ''}
+                              onChange={handleInputChange}
+                              placeholder="username"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end space-x-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditing(false)}
+                            disabled={isUpdating}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleUpdateProfile}
+                            disabled={isUpdating}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            {isUpdating ? 'Saving...' : 'Save Changes'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
-                <span className="ml-3 text-gray-700">Total Habits</span>
               </div>
-              <span className="font-semibold text-gray-900">{stats.totalHabits}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-                  <FaCalendarCheck className="h-5 w-5 text-green-600" />
-                </div>
-                <span className="ml-3 text-gray-700">Completed Habits</span>
+            ) : (
+              <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl shadow">
+                <p className="text-gray-600 dark:text-gray-400">Profile not found.</p>
               </div>
-              <span className="font-semibold text-gray-900">{stats.completedHabits}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
-                  <FaQuran className="h-5 w-5 text-yellow-600" />
-                </div>
-                <span className="ml-3 text-gray-700">Quran Insights</span>
-              </div>
-              <span className="font-semibold text-gray-900">{stats.quranInsights}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
-                  <FaBook className="h-5 w-5 text-purple-600" />
-                </div>
-                <span className="ml-3 text-gray-700">Hadith Insights</span>
-              </div>
-              <span className="font-semibold text-gray-900">{stats.hadithInsights}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                  <FaStar className="h-5 w-5 text-red-600" />
-                </div>
-                <span className="ml-3 text-gray-700">Favorite Insights</span>
-              </div>
-              <span className="font-semibold text-gray-900">{stats.favoriteInsights}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">Edit Profile</h2>
-
-        {error && (
-          <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mt-4 rounded-md bg-green-50 p-4 text-sm text-green-700">
-            {successMessage}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(handleUpdateProfile)} className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              {...register('username')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
-            />
-            {errors.username && (
-              <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
             )}
           </div>
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              {...register('email')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
-            />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+      <AuthDebugger pageName="profile" />
+    </AuthGuard>
   );
-} 
+}
